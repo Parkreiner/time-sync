@@ -1,4 +1,9 @@
-export const noOp = (..._: readonly unknown[]): void => {};
+export const REFRESH_IDLE = Number.POSITIVE_INFINITY;
+export const REFRESH_ONE_SECOND: number = 1_000;
+export const REFRESH_ONE_MINUTE = 60 * REFRESH_ONE_SECOND;
+export const REFRESH_ONE_HOUR = 60 * REFRESH_ONE_MINUTE;
+
+const noOp = (..._: readonly unknown[]): void => {};
 
 /**
  * All of TimeSync is basically centered around managing a single Date value,

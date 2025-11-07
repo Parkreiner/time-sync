@@ -1,4 +1,4 @@
-import { TimeSync } from "./TimeSync";
+import { TimeSync } from "../TimeSync";
 
 const sampleInvalidIntervals: readonly number[] = [
 	Number.NaN,
