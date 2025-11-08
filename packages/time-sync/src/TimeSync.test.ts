@@ -1,43 +1,74 @@
 import { afterEach, beforeEach, describe, it, vi } from "vitest";
 import { newReadonlyDate, REFRESH_ONE_SECOND, TimeSync } from "./TimeSync";
 
-const defaultInitialDate = newReadonlyDate("October 27, 2025");
-const sampleInvalidIntervals: readonly number[] = [
-	Number.NaN,
-	Number.NEGATIVE_INFINITY,
-	0,
-	-42,
-	470.53,
-];
+// newReadonlyDate is mostly being treated as an internal implementation
+// detail for the moment, but because we still export it for convenience,
+// we need to make sure that it's 100% interchangeable with native Date
+// objects for all purposes aside from mutations
+describe(newReadonlyDate.name, () => {
+	it("Mirrors all instantiation methods from native Date object", ({
+		expect,
+	}) => {
+		expect.hasAssertions();
+	});
 
-beforeEach(() => {
-	vi.useFakeTimers();
+	it("Turns all set-based methods into no-ops", ({ expect }) => {
+		expect.hasAssertions();
+	});
+
+	it("Is equivalent to native Date objects for all other purposes", ({
+		expect,
+	}) => {
+		expect.hasAssertions();
+	});
 });
 
-afterEach(() => {
-	vi.useRealTimers();
-});
-
-// Just doing a bunch of pseodocode tests for now to validate my assumptions
-// about how the system should work
 describe(TimeSync.name, () => {
+	function initializeSystemDate(dateString: string = "October 27, 2025"): Date {
+		const sourceDate = new Date(dateString);
+		vi.setSystemTime(sourceDate);
+		return newReadonlyDate(sourceDate);
+	}
+
+	const sampleInvalidIntervals: readonly number[] = [
+		Number.NaN,
+		Number.NEGATIVE_INFINITY,
+		0,
+		-42,
+		470.53,
+	];
+
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
 	describe("Subscriptions: default behavior", () => {
-		it("Does not automatically update internal state while there are zero subscribers", async ({
+		it("Never auto-updates state while there are zero subscribers", async ({
 			expect,
 		}) => {
-			const sync = new TimeSync({ initialDate: defaultInitialDate });
+			const initialDate = initializeSystemDate();
+			const sync = new TimeSync({ initialDate });
 			const initialSnap = sync.getStateSnapshot();
-			expect(initialSnap).toEqual(defaultInitialDate);
+			expect(initialSnap).toEqual(initialDate);
 
 			await vi.advanceTimersByTimeAsync(5 * REFRESH_ONE_SECOND);
-			const newSnap = sync.getStateSnapshot();
-			expect(initialSnap).toEqual(newSnap);
+			const newSnap1 = sync.getStateSnapshot();
+			expect(newSnap1).toEqual(initialSnap);
+
+			await vi.advanceTimersByTimeAsync(500 * REFRESH_ONE_SECOND);
+			const newSnap2 = sync.getStateSnapshot();
+			expect(newSnap2).toEqual(initialSnap);
 		});
 
-		it.only("Lets a single subscriber subscribe to periodic time updates", async ({
+		it.only("Lets a single external system subscribe to periodic time updates", async ({
 			expect,
 		}) => {
-			const sync = new TimeSync({ initialDate: defaultInitialDate });
+			const initialDate = initializeSystemDate();
+			const sync = new TimeSync({ initialDate });
 			const onUpdate = vi.fn();
 			sync.subscribe({ onUpdate, targetRefreshIntervalMs: REFRESH_ONE_SECOND });
 			expect(onUpdate).not.toHaveBeenCalled();
@@ -46,6 +77,7 @@ describe(TimeSync.name, () => {
 			const snap1 = sync.getStateSnapshot();
 			expect(onUpdate).toHaveBeenCalledTimes(1);
 			expect(onUpdate).toHaveBeenCalledWith(snap1);
+			onUpdate.mockRestore();
 
 			await vi.advanceTimersByTimeAsync(REFRESH_ONE_SECOND);
 			const snap2 = sync.getStateSnapshot();
