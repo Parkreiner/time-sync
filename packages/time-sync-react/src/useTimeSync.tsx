@@ -13,7 +13,7 @@ import React, {
     useState,
     useSyncExternalStore,
 } from "react";
-import { newReadonlyDate, TimeSync } from "../../core/src"
+import { newReadonlyDate, TimeSync } from "../../time-sync/src"
 import { useEffectEvent as polyfill } from "./useEffectEventPolyfill";
 
 const useEffectEvent: typeof polyfill = typeof React.useEffectEvent === "undefined"
