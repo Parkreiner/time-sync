@@ -41,7 +41,7 @@ describe.concurrent(TimeSync.name, () => {
 		vi.restoreAllMocks();
 	});
 
-	const sampleLiveRefreshRates = [
+	const sampleLiveRefreshRates: readonly number[] = [
 		REFRESH_ONE_SECOND,
 		REFRESH_ONE_MINUTE,
 		REFRESH_ONE_HOUR,
@@ -76,8 +76,7 @@ describe.concurrent(TimeSync.name, () => {
 		it.only("Lets a single external system subscribe to periodic time updates", async ({
 			expect,
 		}) => {
-			const initialDate = initializeTime();
-			const sync = new TimeSync({ initialDate });
+			const sync = new TimeSync({ initialDate: initializeTime() });
 			const onUpdate = vi.fn();
 
 			for (const rate of sampleLiveRefreshRates) {
@@ -106,7 +105,9 @@ describe.concurrent(TimeSync.name, () => {
 		// This is really important behavior for the React bindings. Those use
 		// useSyncExternalStore under the hood, which require that you always
 		// return out the same value by reference every time React tries to pull
-		// a value from an external state source
+		// a value from an external state source. Otherwise the hook will keep
+		// pulling the values over and over again until it gives up and throws
+		// a runtime error
 		it("Exposes the exact same date snapshot (by reference) to subscribers on each update", ({
 			expect,
 		}) => {

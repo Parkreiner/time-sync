@@ -156,7 +156,7 @@ type TransformationEntry = {
 /**
  * The main conceit for this file is that all of the core state is stored in a
  * global-ish instance of ReactTimeSync, and then useTimeSync and
- * useTimeSyncState control the class via React hooks and lifecycle behavior.
+ * useTimeSyncRef control the class via React hooks and lifecycle behavior.
  *
  * Because you can't share generics at a module level, the class uses a bunch
  * of `unknown` types to handle storing arbitrary data.
@@ -346,9 +346,9 @@ class ReactTimeSync {
          *
          * @todo There is a chance that if any given render pass takes an
          * especially long time, and we have subscribers that need updates
-         * faster than every second, reusing an old snapshot across multiple
-         * cascading layout renders might not be safe. But better to hold off on
-         * handling that edge case for now
+         * faster than every second. In that case, reusing an old snapshot
+         * across multiple cascading layout renders might not be safe. But better
+         * to hold off on handling that edge case for now.
          */
         if (!this.#isProviderMounted || this.#batchMountUpdateId !== undefined) {
             return;
@@ -441,23 +441,21 @@ export const TimeSyncProvider: FC<TimeSyncProviderProps> = ({
 
 /**
  * Provides direct access to the TimeSync instance being dependency-injected
- * throughout the React application.
+ * throughout the React application. It functions as ref state – most of its
+ * methods are NOT safe to access during renders, and only from within effects
+ * (whether that's some version of useEffect, or an event handler).
  *
- * This lets you a component receive the active TimeSync without binding it to
- * React lifecycles (essentially making it ref state).
- *
- * The instance methods generally shouldn't be called during a render, unless
- * you take the pains to make all the logic render-safe. If you need to
- * bind state updates to TimeSync, consider using `useTimeSyncState` instead,
- * which handles all those safety concerns for you automatically.
+ * If you need to bind React state updates to TimeSync, consider using
+ * `useTimeSync` instead, which handles all render-safety concerns for you
+ * automatically.
  */
-export function useTimeSync(): TimeSync {
+export function useTimeSyncRef(): TimeSync {
     const reactTs = useReactTimeSync();
     return reactTs.getTimeSync();
 }
 
 // Even though this is a really simple function, keeping it defined outside
-// useTimeSyncState helps with render performance, and helps stabilize a bunch
+// useTimeSync helps with render performance, and helps stabilize a bunch
 // of values in the hook when you're not doing transformations
 function identity<T>(value: T): T {
     return value;
@@ -521,7 +519,7 @@ type UseTimeSyncOptions<T> = Readonly<{
  *    avoid stale date issues, and will happen even if all other subscribers
  *    were subscribed with an interval of positive infinity.
  */
-export function useTimeSyncState<T = Date>(options: UseTimeSyncOptions<T>): T {
+export function useTimeSync<T = Date>(options: UseTimeSyncOptions<T>): T {
     const { targetIntervalMs, transform } = options;
     const activeTransform = (transform ?? identity) as TransformCallback<T>;
 
