@@ -116,13 +116,14 @@ export type SubscriptionHandshake = Readonly<{
 	 *
 	 * A, B, and C will all be updated at a rate of 500ms. If A unsubscribes,
 	 * then B and C will shift to being updated every 1000ms. If B unsubscribes
-	 * after A, updates will pause completely.
+	 * after A, updates will pause completely until a new subscriber gets
+	 * added, and it has a non-infinite interval.
 	 */
 	targetRefreshIntervalMs: number;
 	onUpdate: OnTimeSyncUpdate;
 }>;
 
-type InvalidateSnapshotOptions = Readonly<{
+export type InvalidateSnapshotOptions = Readonly<{
 	/**
 	 * The amount of time (in milliseconds) that you can tolerate stale dates.
 	 * If the time since the last subscription dispatch and the current time
@@ -164,7 +165,7 @@ interface TimeSyncApi {
 	 * @returns An unsubscribe callback. Calling the callback more than once
 	 * results in a no-op.
 	 */
-	subscribe: (sh: SubscriptionHandshake) => () => void;
+	subscribe: (handshake: SubscriptionHandshake) => () => void;
 
 	/**
 	 * Allows any system to pull the latest time state from TimeSync, regardless
@@ -181,8 +182,8 @@ interface TimeSyncApi {
 	 * @throws {RangeError} If the provided interval for the
 	 * `stalenessThresholdMs` property is neither a positive integer nor
 	 * positive infinity.
-	 * @returns The date state post-invalidation (which might be the same as
-	 * before).
+	 * @returns The latest date state snapshot right after invalidation. Note
+	 * that this snapshot might be the same as before.
 	 */
 	invalidateStateSnapshot: (options: InvalidateSnapshotOptions) => Date;
 
@@ -211,9 +212,7 @@ const defaultMinimumRefreshIntervalMs: number = 200;
  * tearing and stale data for only some parts of the screen).
  *
  * By design, there is no way to let a subscriber disable updates. That defeats
- * the goal of needing to keep everything in sync with each other. If updates
- * are happening too frequently in React, restructure how you're composing your
- * components to minimize the costs of re-renders.
+ * the goal of needing to keep everything in sync with each other.
  *
  * See comments for exported methods and types for more information.
  */
@@ -227,7 +226,7 @@ export class TimeSync implements TimeSyncApi {
 	// Stores all refresh intervals actively associated with an onUpdate
 	// callback (along with their associated unsubscribe callbacks). "Duplicate"
 	// intervals are allowed (in case multiple systems subscribe with the same
-	// interval-onUpdate pairs). Each map value should stay sorted by refresh
+	// interval-callback pairs). Each map value should stay sorted by refresh
 	// interval, in ascending order.
 	#subscriptions: Map<OnTimeSyncUpdate, SubscriptionEntry[]>;
 
@@ -299,7 +298,7 @@ export class TimeSync implements TimeSyncApi {
 	 * Defined as an arrow function so that we can just pass it directly to
 	 * setInterval without needing to make a new wrapper function each time. We
 	 * don't have many situations where we can lose the `this` context, but this
-	 * is one of them
+	 * is one of them.
 	 */
 	#onTick = (): void => {
 		if (this.#isDisposed || this.#isFrozen) {

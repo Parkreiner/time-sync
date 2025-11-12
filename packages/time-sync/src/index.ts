@@ -1,5 +1,6 @@
 // Not using wildcard syntax to make final dependencies more obvious
 export {
+	type InvalidateSnapshotOptions,
 	newReadonlyDate,
 	REFRESH_IDLE,
 	REFRESH_ONE_HOUR,
