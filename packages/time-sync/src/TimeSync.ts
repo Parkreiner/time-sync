@@ -54,6 +54,11 @@ export function newReadonlyDate(sourceDate?: Date | string | number): Date {
 			}
 			case "string": {
 				newDate = sourceDate ? new Date(sourceDate) : new Date();
+				break;
+			}
+			default: {
+				const exhaustionCheck: never = sourceDate;
+				throw new Error(`Received unknown value ${exhaustionCheck}`);
 			}
 		}
 	}
