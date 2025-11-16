@@ -38,32 +38,72 @@ const readonlyEnforcer: ProxyHandler<Date> = {
  * This function does not use a custom type to make it easier to interface with
  * existing time libraries.
  */
-export function newReadonlyDate(sourceDate?: Date | string | number): Date {
-	let newDate: Date;
-	if (sourceDate instanceof Date) {
-		newDate = new Date(sourceDate);
+// Very chaotic type signature, but that's an artifact of how wonky the native
+// Date type is. Using conditional types isn't great, because the number of
+// arguments you can pass in can vary so much, so we're going for ugly function
+// overloads
+export function newReadonlyDate(): Date;
+export function newReadonlyDate(initValue: number): Date;
+export function newReadonlyDate(initValue: string): Date;
+export function newReadonlyDate(initValue: Date): Date;
+export function newReadonlyDate(initValue: number, monthIndex: number): Date;
+export function newReadonlyDate(
+	initValue: number,
+	monthIndex: number,
+	day: number,
+): Date;
+export function newReadonlyDate(
+	initValue: number,
+	monthIndex: number,
+	day: number,
+	hours: number,
+): Date;
+export function newReadonlyDate(
+	initValue: number,
+	monthIndex: number,
+	day: number,
+	hours: number,
+	seconds: number,
+): Date;
+export function newReadonlyDate(
+	initValue: number,
+	monthIndex: number,
+	day: number,
+	hours: number,
+	seconds: number,
+	milliseconds: number,
+): Date;
+export function newReadonlyDate(
+	initValue?: number | string | Date,
+	monthIndex?: number,
+	day?: number,
+	hours?: number,
+	minutes?: number,
+	seconds?: number,
+	milliseconds?: number,
+): Date {
+	let source: Date;
+	if (initValue === undefined) {
+		source = new Date();
+	} else if (monthIndex === undefined) {
+		source = new Date(initValue);
+	} else if (typeof initValue !== "number") {
+		throw new TypeError(
+			`Impossible case encountered: init value has type of '${typeof initValue}, but additional arguments were provided after the first`,
+		);
 	} else {
-		switch (typeof sourceDate) {
-			case "undefined": {
-				newDate = new Date();
-				break;
-			}
-			case "number": {
-				newDate = new Date(sourceDate);
-				break;
-			}
-			case "string": {
-				newDate = sourceDate ? new Date(sourceDate) : new Date();
-				break;
-			}
-			default: {
-				const exhaustionCheck: never = sourceDate;
-				throw new Error(`Received unknown value ${exhaustionCheck}`);
-			}
-		}
+		source = new Date(
+			initValue,
+			monthIndex,
+			day,
+			hours,
+			minutes,
+			seconds,
+			milliseconds,
+		);
 	}
 
-	return new Proxy(newDate, readonlyEnforcer);
+	return new Proxy(source, readonlyEnforcer);
 }
 
 type TimeSyncInitOptions = Readonly<{

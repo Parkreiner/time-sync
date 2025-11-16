@@ -12,19 +12,22 @@ import {
 // we need to make sure that it's 100% interchangeable with native Date
 // objects for all purposes aside from mutations
 describe.concurrent(newReadonlyDate.name, () => {
-	it("Mirrors all instantiation methods from native Date object", ({
-		expect,
-	}) => {
+	// Asserting this first because we rely on this behavior for the other tests
+	it.only("Supports equality checks against native Dates", ({ expect }) => {
+		const controlDate = new Date("October 27, 2025");
+		const readonly = newReadonlyDate("October 27, 2025");
+		expect(controlDate).toEqual(readonly);
+	});
+
+	it("Mirrors type signature of native Dates", ({ expect }) => {
+		expect.hasAssertions();
+	});
+
+	it("Can be instantiated via other readonly Dates", ({ expect }) => {
 		expect.hasAssertions();
 	});
 
 	it("Turns all mutation methods into no-ops", ({ expect }) => {
-		expect.hasAssertions();
-	});
-
-	it("Is equivalent to native Date objects for all other purposes", ({
-		expect,
-	}) => {
 		expect.hasAssertions();
 	});
 });
@@ -73,7 +76,7 @@ describe.concurrent(TimeSync.name, () => {
 			expect(newSnap2).toEqual(initialSnap);
 		});
 
-		it.only("Lets a single external system subscribe to periodic time updates", async ({
+		it("Lets a single external system subscribe to periodic time updates", async ({
 			expect,
 		}) => {
 			const sync = new TimeSync({ initialDate: initializeTime() });
