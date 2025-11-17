@@ -208,7 +208,7 @@ class ReactTimeSync {
 	// Only safe to call inside a render that is bound to useSyncExternalStore
 	// in some way
 	getDateSnapshot(): Date {
-		return this.#timeSync.getStateSnapshot();
+		return this.#timeSync.getSnapshot();
 	}
 
 	// Always safe to call inside a render
@@ -276,11 +276,10 @@ class ReactTimeSync {
 		// Regardless of how the subscription happened, update all other
 		// subscribers to get them in sync with the newest state
 		const shouldInvalidateDate =
-			newReadonlyDate().getTime() -
-				this.#timeSync.getStateSnapshot().getTime() >
+			newReadonlyDate().getTime() - this.#timeSync.getSnapshot().getTime() >
 			ReactTimeSync.#stalenessThresholdMs;
 		if (shouldInvalidateDate) {
-			void this.#timeSync.invalidateStateSnapshot({
+			void this.#timeSync.invalidateSnapshot({
 				// This is normally a little risky, but because of how the
 				// onUpdate callback above is defined, dispatching a
 				// subscription update doesn't always trigger a re-render
@@ -327,7 +326,7 @@ class ReactTimeSync {
 			return prev.cachedTransformation as T;
 		}
 
-		const latestDate = this.#timeSync.getStateSnapshot();
+		const latestDate = this.#timeSync.getSnapshot();
 		return latestDate as T;
 	}
 
@@ -357,7 +356,7 @@ class ReactTimeSync {
 			this.#batchMountUpdateId = undefined;
 		});
 
-		void this.#timeSync.invalidateStateSnapshot({
+		void this.#timeSync.invalidateSnapshot({
 			notificationBehavior: "onChange",
 		});
 	}
@@ -371,7 +370,7 @@ class ReactTimeSync {
 		// have really slow refresh intervals, when a new component gets
 		// mounted, it will be guaranteed to have "fresh-ish" data.
 		this.#invalidationIntervalId = setTimeout(() => {
-			this.#timeSync.invalidateStateSnapshot({
+			this.#timeSync.invalidateSnapshot({
 				stalenessThresholdMs: ReactTimeSync.#stalenessThresholdMs,
 				notificationBehavior: "never",
 			});

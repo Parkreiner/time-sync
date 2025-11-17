@@ -1,4 +1,6 @@
-// Not using wildcard syntax to make final exported dependencies more obvious
+// Not using wildcard syntax to make final exported dependencies more obvious.
+// There's not that many of them, so clarity is more important than saving on
+// extra keystrokes.
 export { newReadonlyDate } from "./readonlyDate";
 export {
 	type InvalidateSnapshotOptions,
@@ -8,4 +10,6 @@ export {
 	REFRESH_ONE_SECOND,
 	type SubscriptionHandshake,
 	TimeSync,
+	type TimeSyncInitOptions,
+	type TimeSyncSnapshot,
 } from "./TimeSync";

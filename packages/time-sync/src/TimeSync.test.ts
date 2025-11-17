@@ -44,19 +44,19 @@ describe.concurrent(TimeSync.name, () => {
 		}) => {
 			const initialDate = initializeTime();
 			const sync = new TimeSync({ initialDate });
-			const initialSnap = sync.getStateSnapshot();
+			const initialSnap = sync.getSnapshot();
 			expect(initialSnap).toEqual(initialDate);
 
 			await vi.advanceTimersByTimeAsync(5 * REFRESH_ONE_SECOND);
-			const newSnap1 = sync.getStateSnapshot();
+			const newSnap1 = sync.getSnapshot();
 			expect(newSnap1).toEqual(initialSnap);
 
 			await vi.advanceTimersByTimeAsync(500 * REFRESH_ONE_SECOND);
-			const newSnap2 = sync.getStateSnapshot();
+			const newSnap2 = sync.getSnapshot();
 			expect(newSnap2).toEqual(initialSnap);
 		});
 
-		it.only("Lets a single system subscribe to updates", async ({ expect }) => {
+		it("Lets a single system subscribe to updates", async ({ expect }) => {
 			const initialDate = initializeTime();
 			const sync = new TimeSync({ initialDate });
 			const onUpdate = vi.fn();
@@ -68,13 +68,13 @@ describe.concurrent(TimeSync.name, () => {
 				});
 				expect(onUpdate).not.toHaveBeenCalled();
 
-				const snapBefore = sync.getStateSnapshot();
+				const dateBefore = sync.getSnapshot().dateSnapshot;
 				await vi.advanceTimersByTimeAsync(rate);
-				const snapAfter = sync.getStateSnapshot();
+				const dateAfter = sync.getSnapshot().dateSnapshot;
 				expect(onUpdate).toHaveBeenCalledTimes(1);
-				expect(onUpdate).toHaveBeenCalledWith(snapAfter);
+				expect(onUpdate).toHaveBeenCalledWith(dateAfter);
 
-				const diff = snapAfter.getMilliseconds() - snapBefore.getMilliseconds();
+				const diff = dateAfter.getMilliseconds() - dateBefore.getMilliseconds();
 				const threshold = Math.abs(diff - rate);
 				expect(threshold).toBeLessThanOrEqual(epsilonThreshold);
 
@@ -247,6 +247,10 @@ describe.concurrent(TimeSync.name, () => {
 		it("Never mutates snapshots", ({ expect }) => {
 			expect.hasAssertions();
 		});
+
+		it("Provides accurate count of active subscriptions", ({ expect }) => {
+			expect.hasAssertions();
+		});
 	});
 
 	describe("Invalidating snapshots", () => {
@@ -269,12 +273,16 @@ describe.concurrent(TimeSync.name, () => {
 		});
 	});
 
-	describe("Behavior when disposing", () => {
+	describe("Disposing a TimeSync instance", () => {
 		it("Clears active interval", ({ expect }) => {
 			expect.hasAssertions();
 		});
 
 		it("Automatically unsubscribes everything", ({ expect }) => {
+			expect.hasAssertions();
+		});
+
+		it("Indicates disposed status in pulled snapshots", ({ expect }) => {
 			expect.hasAssertions();
 		});
 	});
@@ -283,6 +291,10 @@ describe.concurrent(TimeSync.name, () => {
 		it("Never updates internal state, no matter how many subscribers susbcribe", ({
 			expect,
 		}) => {
+			expect.hasAssertions();
+		});
+
+		it("Indicates frozen status in pulled snapshots", ({ expect }) => {
 			expect.hasAssertions();
 		});
 	});

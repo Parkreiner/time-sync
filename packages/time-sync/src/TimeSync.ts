@@ -6,7 +6,7 @@ export const REFRESH_ONE_SECOND: number = 1000;
 export const REFRESH_ONE_MINUTE = 60 * REFRESH_ONE_SECOND;
 export const REFRESH_ONE_HOUR = 60 * REFRESH_ONE_MINUTE;
 
-type TimeSyncInitOptions = Readonly<{
+export type TimeSyncInitOptions = Readonly<{
 	/**
 	 * The Date object to use when initializing TimeSync to make the constructor
 	 * more pure and deterministic.
@@ -90,6 +90,17 @@ export type InvalidateSnapshotOptions = Readonly<{
 	notificationBehavior?: "onChange" | "never" | "always";
 }>;
 
+/**
+ * A complete snapshot of the user-relevant internal state from TimeSync.
+ */
+export type TimeSyncSnapshot = Readonly<{
+	dateSnapshot: Date;
+	subscriberCount: number;
+	isFrozen: boolean;
+	isDisposed: boolean;
+	minUpdateIntervalMs: number;
+}>;
+
 interface TimeSyncApi {
 	/**
 	 * Subscribes an external system to TimeSync.
@@ -113,7 +124,7 @@ interface TimeSyncApi {
 	 *
 	 * @returns The Date produced from the most recent internal update.
 	 */
-	getStateSnapshot: () => Date;
+	getSnapshot: () => TimeSyncSnapshot;
 
 	/**
 	 * Immediately tries to refresh the current date snapshot, regardless of
@@ -125,7 +136,7 @@ interface TimeSyncApi {
 	 * @returns The latest date state snapshot right after invalidation. Note
 	 * that this snapshot might be the same as before.
 	 */
-	invalidateStateSnapshot: (options: InvalidateSnapshotOptions) => Date;
+	invalidateSnapshot: (options: InvalidateSnapshotOptions) => TimeSyncSnapshot;
 
 	/**
 	 * Cleans up the TimeSync instance and renders it inert for all other
@@ -157,11 +168,8 @@ const defaultMinimumRefreshIntervalMs: number = 200;
  * See comments for exported methods and types for more information.
  */
 export class TimeSync implements TimeSyncApi {
-	readonly #minimumRefreshIntervalMs: number;
-	readonly #isFrozen: boolean;
-	#isDisposed: boolean;
-	#latestDateSnapshot: Date;
-	#hasPendingNotification: boolean;
+	#latestSnapshot: TimeSyncSnapshot;
+	#hasPendingBroadcast: boolean;
 
 	// Stores all refresh intervals actively associated with an onUpdate
 	// callback (along with their associated unsubscribe callbacks). "Duplicate"
@@ -197,22 +205,27 @@ export class TimeSync implements TimeSyncApi {
 			);
 		}
 
-		this.#isDisposed = false;
-		this.#hasPendingNotification = false;
-		this.#isFrozen = freezeUpdates;
+		this.#hasPendingBroadcast = false;
 		this.#subscriptions = new Map();
-		this.#latestDateSnapshot = newReadonlyDate(initialDate);
 		this.#fastestRefreshInterval = Number.POSITIVE_INFINITY;
-		this.#minimumRefreshIntervalMs = minimumRefreshIntervalMs;
 		this.#intervalId = undefined;
+
+		this.#latestSnapshot = {
+			dateSnapshot: newReadonlyDate(initialDate),
+			subscriberCount: 0,
+			isFrozen: freezeUpdates,
+			isDisposed: false,
+			minUpdateIntervalMs: minimumRefreshIntervalMs,
+		};
 	}
 
 	#notifyAllSubscriptions(): void {
 		// We still need to let the logic go through if the current fastest
 		// interval is Infinity, so that we can support letting any arbitrary
 		// consumer invalidate the date immediately
+		const { isDisposed, isFrozen } = this.#latestSnapshot;
 		const subscriptionsPaused =
-			this.#isDisposed || this.#isFrozen || this.#subscriptions.size === 0;
+			isDisposed || isFrozen || this.#subscriptions.size === 0;
 		if (subscriptionsPaused) {
 			return;
 		}
@@ -221,7 +234,7 @@ export class TimeSync implements TimeSyncApi {
 		// absolutely sure that if the `this` context magically changes between
 		// callback calls (e.g., one of the subscribers calling the invalidate
 		// method), it doesn't cause subscribers to receive different values.
-		const bound = this.#latestDateSnapshot;
+		const bound = this.#latestSnapshot.dateSnapshot;
 
 		// While this is a super niche use case, we're actually safe if a
 		// subscriber disposes of the whole TimeSync instance. Once the Map is
@@ -241,7 +254,8 @@ export class TimeSync implements TimeSyncApi {
 	 * is one of them.
 	 */
 	#onTick = (): void => {
-		if (this.#isDisposed || this.#isFrozen) {
+		const { isDisposed, isFrozen } = this.#latestSnapshot;
+		if (isDisposed || isFrozen) {
 			// Defensive step to make sure that an invalid tick wasn't started
 			clearInterval(this.#intervalId);
 			this.#intervalId = undefined;
@@ -249,18 +263,17 @@ export class TimeSync implements TimeSyncApi {
 		}
 
 		const wasUpdated = this.#updateDateSnapshot();
-		if (wasUpdated || this.#hasPendingNotification) {
+		if (wasUpdated || this.#hasPendingBroadcast) {
 			this.#notifyAllSubscriptions();
 		}
-		this.#hasPendingNotification = false;
+		this.#hasPendingBroadcast = false;
 	};
 
 	#onFastestIntervalChange(): void {
 		const fastest = this.#fastestRefreshInterval;
+		const { isDisposed, isFrozen } = this.#latestSnapshot;
 		const skipUpdate =
-			this.#isDisposed ||
-			this.#isFrozen ||
-			fastest === Number.POSITIVE_INFINITY;
+			isDisposed || isFrozen || fastest === Number.POSITIVE_INFINITY;
 		if (skipUpdate) {
 			clearInterval(this.#intervalId);
 			this.#intervalId = undefined;
@@ -268,7 +281,8 @@ export class TimeSync implements TimeSyncApi {
 		}
 
 		const elapsed =
-			newReadonlyDate().getTime() - this.#latestDateSnapshot.getMilliseconds();
+			newReadonlyDate().getTime() -
+			this.#latestSnapshot.dateSnapshot.getMilliseconds();
 		const timeBeforeNextUpdate = fastest - elapsed;
 
 		if (timeBeforeNextUpdate <= 0) {
@@ -276,7 +290,7 @@ export class TimeSync implements TimeSyncApi {
 			const updated = this.#updateDateSnapshot();
 			if (updated) {
 				this.#notifyAllSubscriptions();
-				this.#hasPendingNotification = false;
+				this.#hasPendingBroadcast = false;
 			}
 			this.#intervalId = setInterval(this.#onTick, fastest);
 			return;
@@ -290,7 +304,8 @@ export class TimeSync implements TimeSyncApi {
 	}
 
 	#updateFastestInterval(): void {
-		if (this.#isDisposed || this.#isFrozen) {
+		const { isDisposed, isFrozen } = this.#latestSnapshot;
+		if (isDisposed || isFrozen) {
 			this.#fastestRefreshInterval = Number.POSITIVE_INFINITY;
 			return;
 		}
@@ -313,18 +328,28 @@ export class TimeSync implements TimeSyncApi {
 		}
 	}
 
+	#countSubscriptions(): number {
+		let total = 0;
+		for (const subGroup of this.#subscriptions.values()) {
+			total += subGroup.length;
+		}
+		return total;
+	}
+
 	/**
 	 * Attempts to update the current Date snapshot, no questions asked.
 	 * @returns {boolean} Indicates whether the state actually changed.
 	 */
 	#updateDateSnapshot(stalenessThresholdMs = 0): boolean {
-		if (this.#isDisposed || this.#isFrozen) {
+		const { isDisposed, isFrozen, minUpdateIntervalMs } = this.#latestSnapshot;
+		if (isDisposed || isFrozen) {
 			return false;
 		}
 
 		const newSnap = newReadonlyDate();
 		const exceedsUpdateThreshold =
-			newSnap.getMilliseconds() - this.#latestDateSnapshot.getMilliseconds() <
+			newSnap.getMilliseconds() -
+				this.#latestSnapshot.dateSnapshot.getMilliseconds() <
 			stalenessThresholdMs;
 		if (!exceedsUpdateThreshold) {
 			return false;
@@ -333,13 +358,20 @@ export class TimeSync implements TimeSyncApi {
 		// It's not ever safe for this method to flip this property to false,
 		// because it doesn't have enough context about where it will be called
 		// to know whether that could break other stateful logic
-		this.#hasPendingNotification = true;
-		this.#latestDateSnapshot = newSnap;
+		this.#hasPendingBroadcast = true;
+		this.#latestSnapshot = {
+			isDisposed,
+			isFrozen,
+			minUpdateIntervalMs,
+			dateSnapshot: newSnap,
+			subscriberCount: this.#countSubscriptions(),
+		};
 		return true;
 	}
 
 	subscribe(sh: SubscriptionHandshake): () => void {
-		if (this.#isDisposed || this.#isFrozen) {
+		const { isDisposed, isFrozen, minUpdateIntervalMs } = this.#latestSnapshot;
+		if (isDisposed || isFrozen) {
 			return noOp;
 		}
 
@@ -384,7 +416,7 @@ export class TimeSync implements TimeSyncApi {
 		}
 
 		const targetInterval = Math.max(
-			this.#minimumRefreshIntervalMs,
+			minUpdateIntervalMs,
 			targetRefreshIntervalMs,
 		);
 		entries.push({ unsubscribe, targetInterval });
@@ -394,13 +426,14 @@ export class TimeSync implements TimeSyncApi {
 		return unsubscribe;
 	}
 
-	getStateSnapshot(): Date {
-		return this.#latestDateSnapshot;
+	getSnapshot(): TimeSyncSnapshot {
+		return this.#latestSnapshot;
 	}
 
-	invalidateStateSnapshot(options?: InvalidateSnapshotOptions): Date {
-		if (this.#isDisposed || this.#isFrozen) {
-			return this.#latestDateSnapshot;
+	invalidateSnapshot(options?: InvalidateSnapshotOptions): TimeSyncSnapshot {
+		const { isDisposed, isFrozen } = this.#latestSnapshot;
+		if (isDisposed || isFrozen) {
+			return this.#latestSnapshot;
 		}
 
 		const { stalenessThresholdMs = 0, notificationBehavior = "onChange" } =
@@ -412,27 +445,27 @@ export class TimeSync implements TimeSyncApi {
 				break;
 			}
 			case "always": {
-				this.#hasPendingNotification = false;
+				this.#hasPendingBroadcast = false;
 				this.#notifyAllSubscriptions();
 				break;
 			}
 			case "onChange": {
-				if (wasChanged || this.#hasPendingNotification) {
+				if (wasChanged || this.#hasPendingBroadcast) {
 					this.#notifyAllSubscriptions();
 				}
-				this.#hasPendingNotification = false;
+				this.#hasPendingBroadcast = false;
 				break;
 			}
 		}
 
-		return this.#latestDateSnapshot;
+		return this.#latestSnapshot;
 	}
 
 	dispose(): void {
-		if (this.#isDisposed) {
+		const { isDisposed } = this.#latestSnapshot;
+		if (isDisposed) {
 			return;
 		}
-		this.#isDisposed = true;
 
 		this.#fastestRefreshInterval = 0;
 		clearInterval(this.#intervalId);
@@ -444,5 +477,10 @@ export class TimeSync implements TimeSyncApi {
 			}
 		}
 		this.#subscriptions.clear();
+
+		this.#latestSnapshot = {
+			...this.#latestSnapshot,
+			isDisposed: true,
+		};
 	}
 }
