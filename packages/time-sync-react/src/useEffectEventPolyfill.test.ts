@@ -1,22 +1,22 @@
 import { renderHook } from "@testing-library/react";
-import { useEffectEvent } from "./hookPolyfills";
+import { describe, it, vi } from "vitest";
+import { useEffectEvent } from "./useEffectEventPolyfill";
 
-function renderEffectEvent<TArgs extends unknown[], TReturn = unknown>(
-  callbackArg: (...args: TArgs) => TReturn,
+function renderUseEffectEvent<TArgs extends unknown[], TReturn = unknown>(
+	callbackArg: (...args: TArgs) => TReturn,
 ) {
-  type Callback = typeof callbackArg;
-  type Props = Readonly<{ callback: Callback }>;
-
-  return renderHook<Callback, Props>(
-    ({ callback }) => useEffectEvent(callback),
-    { initialProps: { callback: callbackArg } },
-  );
+	type Callback = typeof callbackArg;
+	type Props = Readonly<{ callback: Callback }>;
+	return renderHook<Callback, Props>(
+		({ callback }) => useEffectEvent(callback),
+		{ initialProps: { callback: callbackArg } },
+	);
 }
 
-describe(useEffectEvent.name, () => {
-	it("Should maintain a stable reference across all renders", () => {
-		const callback = jest.fn();
-		const { result, rerender } = renderEffectEvent(callback);
+describe.concurrent(useEffectEvent.name, () => {
+	it("Should maintain a stable reference across all renders", ({ expect }) => {
+		const callback = vi.fn();
+		const { result, rerender } = renderUseEffectEvent(callback);
 
 		const firstResult = result.current;
 		for (let i = 0; i < 5; i++) {
@@ -25,11 +25,11 @@ describe(useEffectEvent.name, () => {
 		expect(result.current).toBe(firstResult);
 	});
 
-	it("Should always call the most recent callback passed in", () => {
-		const mockCallback1 = jest.fn();
-		const mockCallback2 = jest.fn();
+	it("Should always call the most recent callback passed in", ({ expect }) => {
+		const mockCallback1 = vi.fn();
+		const mockCallback2 = vi.fn();
 
-		const { result, rerender } = renderEffectEvent(mockCallback1);
+		const { result, rerender } = renderUseEffectEvent(mockCallback1);
 		rerender({ callback: mockCallback2 });
 
 		result.current();
