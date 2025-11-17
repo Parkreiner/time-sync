@@ -16,7 +16,8 @@ const noOp = (..._: readonly unknown[]): void => {};
  * methods, so Object.freeze doesn't do anything to help us.
  */
 const readonlyHandler: ProxyHandler<Date> = {
-	get: (date, key) => {
+	set: () => false,
+	get: (date, key, receiver) => {
 		if (typeof key === "string" && key.startsWith("set")) {
 			return noOp;
 		}
@@ -25,14 +26,12 @@ const readonlyHandler: ProxyHandler<Date> = {
 		if (key === Symbol.toStringTag) {
 			return "Date";
 		}
-		const value = date[key as keyof Date];
+
+		const value = Reflect.get(date, key, receiver);
 		if (typeof value === "function") {
 			return value.bind(date);
 		}
 		return value;
-	},
-	set: () => {
-		return false;
 	},
 };
 
@@ -48,9 +47,7 @@ const readonlyHandler: ProxyHandler<Date> = {
 // arguments you can pass in can vary so much, so we're going for ugly function
 // overloads
 export function newReadonlyDate(): Date;
-export function newReadonlyDate(initValue: number): Date;
-export function newReadonlyDate(initValue: string): Date;
-export function newReadonlyDate(initValue: Date): Date;
+export function newReadonlyDate(initValue: number | string | Date): Date;
 export function newReadonlyDate(year: number, monthIndex: number): Date;
 export function newReadonlyDate(
 	year: number,

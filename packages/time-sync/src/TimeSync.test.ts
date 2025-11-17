@@ -7,8 +7,7 @@ import {
 	TimeSync,
 } from "./TimeSync";
 
-// For better or worse, this is a personally meaningful day to me. It's why I
-// was able to find the time to get these packages finished up and published
+// For better or worse, this is a personally meaningful date to me
 const defaultDateString = "October 27, 2025";
 
 // newReadonlyDate is mostly being treated as an internal implementation
@@ -28,13 +27,24 @@ describe.concurrent.only(newReadonlyDate.name, () => {
 	});
 
 	/**
-	 * @todo 2025-11-16 - Need to figure out why, but for some reason, when you
-	 * create an expected Date via an ISO string, all comparisons against it and
-	 * the readonly Date created during the test fail with a TypeError from
-	 * trying to access .toISOString.
+	 * @todo 2025-11-16 - Need to figure out why, but for some reason, sometimes
+	 * when you create an expected native Date via an ISO string, all
+	 * comparisons against it and the readonly Date created during the test fail
+	 * with a TypeError from trying to access the .toISOString method
+	 * (presumably on the readonly date).
 	 *
-	 * Calling .toISOString normally still works, so this might be some weird
-	 * nuance on Vitest's .toEqual method.
+	 * Having trouble reproducing this error – seems very flaky.
+	 *
+	 * Calling .toISOString on the readonly date still works, so this might be
+	 * some weird nuance from how Vitest works.
+	 *
+	 * Current investigations point towards this being a case where native Dates
+	 * have weird interactions with proxy objects
+	 * @see {@link https://community.n8n.io/t/method-date-prototype-toisostring-called-on-incompatible-receiver-object-date/24541}
+	 *
+	 * This behavior has a chance of affecting users, but it's being
+	 * de-prioritized for the initial launch, because it should hopefully be a
+	 * niche issue.
 	 */
 	it("Mirrors type signature of native Dates", ({ expect }) => {
 		// Have to save the version without arguments for last, because it
@@ -44,29 +54,41 @@ describe.concurrent.only(newReadonlyDate.name, () => {
 			expected: Date;
 		}>;
 		const cases = [
-			// {
-			// 	input: [752_475_600_000],
-			// 	expected: new Date("November 5, 1993"),
-			// },
-			// {
-			// 	input: ["September 4, 2000"],
-			// 	expected: new Date("September 4, 2000"),
-			// },
-			// {
-			// 	input: [new Date("January 8, 1940")],
-			// 	expected: new Date("January 8, 1940"),
-			// },
-			// {
-			// 	input: [2009, 10],
-			// 	expected: new Date("November 1, 2009"),
-			// },
-			// {
-			// 	input: [2008, 2, 4],
-			// 	expected: new Date("March 4, 2008"),
-			// },
+			{
+				input: [752_475_600_000],
+				expected: new Date("November 5, 1993"),
+			},
+			{
+				input: ["September 4, 2000"],
+				expected: new Date("September 4, 2000"),
+			},
+			{
+				input: [new Date("January 8, 1940")],
+				expected: new Date("January 8, 1940"),
+			},
+			{
+				input: [2009, 10],
+				expected: new Date("November 1, 2009"),
+			},
+			{
+				input: [2008, 2, 4],
+				expected: new Date("March 4, 2008"),
+			},
 			{
 				input: [2000, 1, 1, 5],
-				expected: new Date("2000-02-01T05:00:00.000Z"),
+				expected: new Date("2000-02-01T10:00:00.000Z"),
+			},
+			{
+				input: [1990, 0, 5, 20, 6],
+				expected: new Date("1990-01-06T01:06:00.000Z"),
+			},
+			{
+				input: [2000, 10, 8, 5, 17, 20],
+				expected: new Date("2000-11-08T10:17:20.000Z"),
+			},
+			{
+				input: [2005, 7, 4, 20, 37, 57, 3],
+				expected: new Date("2005-08-05T00:37:57.003Z"),
 			},
 		] satisfies readonly TestCase[];
 
