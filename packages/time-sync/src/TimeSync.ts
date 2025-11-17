@@ -15,19 +15,24 @@ const noOp = (..._: readonly unknown[]): void => {};
  * Date objects have a lot of private state that can be modified via its set
  * methods, so Object.freeze doesn't do anything to help us.
  */
-const readonlyEnforcer: ProxyHandler<Date> = {
+const readonlyHandler: ProxyHandler<Date> = {
 	get: (date, key) => {
 		if (typeof key === "string" && key.startsWith("set")) {
 			return noOp;
 		}
-		const value = date[key as keyof Date];
-		if (key === "constructor") {
-			return value;
+		// This is necessary for making sure that readonly dates interop
+		// properly with .toEqual in Jest and Vitest
+		if (key === Symbol.toStringTag) {
+			return "Date";
 		}
+		const value = date[key as keyof Date];
 		if (typeof value === "function") {
 			return value.bind(date);
 		}
 		return value;
+	},
+	set: () => {
+		return false;
 	},
 };
 
@@ -46,27 +51,27 @@ export function newReadonlyDate(): Date;
 export function newReadonlyDate(initValue: number): Date;
 export function newReadonlyDate(initValue: string): Date;
 export function newReadonlyDate(initValue: Date): Date;
-export function newReadonlyDate(initValue: number, monthIndex: number): Date;
+export function newReadonlyDate(year: number, monthIndex: number): Date;
 export function newReadonlyDate(
-	initValue: number,
+	year: number,
 	monthIndex: number,
 	day: number,
 ): Date;
 export function newReadonlyDate(
-	initValue: number,
+	year: number,
 	monthIndex: number,
 	day: number,
 	hours: number,
 ): Date;
 export function newReadonlyDate(
-	initValue: number,
+	year: number,
 	monthIndex: number,
 	day: number,
 	hours: number,
 	seconds: number,
 ): Date;
 export function newReadonlyDate(
-	initValue: number,
+	year: number,
 	monthIndex: number,
 	day: number,
 	hours: number,
@@ -92,18 +97,63 @@ export function newReadonlyDate(
 			`Impossible case encountered: init value has type of '${typeof initValue}, but additional arguments were provided after the first`,
 		);
 	} else {
-		source = new Date(
-			initValue,
-			monthIndex,
-			day,
-			hours,
-			minutes,
-			seconds,
-			milliseconds,
-		);
+		/* biome-ignore lint:complexity/noArguments -- Native dates are super
+		 * wonky, and they actually check arguments.length to define behavior
+		 * at runtime. We can't pass all the arguments in via a single call,
+		 * because then the constructor will create an invalid date the moment
+		 * it finds any single undefined value.
+		 *
+		 * Note that invalid dates are still date objects, and basically behave
+		 * like NaN. We're going to throw as much as we can to avoid those weird
+		 * values from creeping into the library.
+		 *
+		 * This is a weird case where TypeScript won't be able to help us,
+		 * because it has no concept of the arguments meta parameter in its type
+		 * system. Brendan Eich's sins in 1995 are biting us 30 years later.
+		 */
+		const argCount = arguments.length;
+		switch (argCount) {
+			case 2: {
+				source = new Date(initValue, monthIndex);
+				break;
+			}
+			case 3: {
+				source = new Date(initValue, monthIndex, day);
+				break;
+			}
+			case 4: {
+				source = new Date(initValue, monthIndex, day, hours);
+				break;
+			}
+			case 5: {
+				source = new Date(initValue, monthIndex, day, hours, minutes);
+				break;
+			}
+			case 6: {
+				source = new Date(initValue, monthIndex, day, hours, minutes, seconds);
+				break;
+			}
+			case 7: {
+				source = new Date(
+					initValue,
+					monthIndex,
+					day,
+					hours,
+					minutes,
+					seconds,
+					milliseconds,
+				);
+				break;
+			}
+			default: {
+				throw new Error(
+					`Cannot instantiate new Date with ${argCount} arguments`,
+				);
+			}
+		}
 	}
 
-	return new Proxy(source, readonlyEnforcer);
+	return new Proxy(source, readonlyHandler);
 }
 
 type TimeSyncInitOptions = Readonly<{
