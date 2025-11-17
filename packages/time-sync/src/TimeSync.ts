@@ -342,11 +342,8 @@ export class TimeSync implements TimeSyncApi {
 	 * @returns {boolean} Indicates whether the state actually changed.
 	 */
 	#updateDateSnapshot(stalenessThresholdMs = 0): boolean {
-		const {
-			isDisposed,
-			isFrozen,
-			minimumRefreshIntervalMs: minUpdateIntervalMs,
-		} = this.#latestSnapshot;
+		const { isDisposed, isFrozen, minimumRefreshIntervalMs } =
+			this.#latestSnapshot;
 		if (isDisposed || isFrozen) {
 			return false;
 		}
@@ -367,7 +364,7 @@ export class TimeSync implements TimeSyncApi {
 		this.#latestSnapshot = Object.freeze({
 			isDisposed,
 			isFrozen,
-			minimumRefreshIntervalMs: minUpdateIntervalMs,
+			minimumRefreshIntervalMs,
 			dateSnapshot: newSnap,
 			subscriberCount: this.#countSubscriptions(),
 		});
@@ -375,11 +372,8 @@ export class TimeSync implements TimeSyncApi {
 	}
 
 	subscribe(sh: SubscriptionHandshake): () => void {
-		const {
-			isDisposed,
-			isFrozen,
-			minimumRefreshIntervalMs: minUpdateIntervalMs,
-		} = this.#latestSnapshot;
+		const { isDisposed, isFrozen, minimumRefreshIntervalMs } =
+			this.#latestSnapshot;
 		if (isDisposed || isFrozen) {
 			return noOp;
 		}
@@ -430,7 +424,7 @@ export class TimeSync implements TimeSyncApi {
 		}
 
 		const targetInterval = Math.max(
-			minUpdateIntervalMs,
+			minimumRefreshIntervalMs,
 			targetRefreshIntervalMs,
 		);
 		entries.push({ unsubscribe, targetInterval });
