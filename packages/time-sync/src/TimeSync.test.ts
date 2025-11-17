@@ -26,14 +26,6 @@ const sampleLiveRefreshRates: readonly number[] = [
 	REFRESH_ONE_HOUR,
 ];
 
-const sampleInvalidIntervals: readonly number[] = [
-	Number.NaN,
-	Number.NEGATIVE_INFINITY,
-	0,
-	-42,
-	470.53,
-];
-
 type Writeable<T> = { -readonly [Key in keyof T]: T[Key] };
 
 beforeEach(() => {
@@ -112,7 +104,14 @@ describe.concurrent(TimeSync.name, () => {
 			const sync = new TimeSync();
 			const dummyFunction = vi.fn();
 
-			for (const i of sampleInvalidIntervals) {
+			const intervals: readonly number[] = [
+				Number.NaN,
+				Number.NEGATIVE_INFINITY,
+				0,
+				-42,
+				470.53,
+			];
+			for (const i of intervals) {
 				expect(() => {
 					void sync.subscribe({
 						targetRefreshIntervalMs: i,
@@ -224,7 +223,14 @@ describe.concurrent(TimeSync.name, () => {
 		it("Throws if custom min interval is not a positive integer", ({
 			expect,
 		}) => {
-			for (const i of sampleInvalidIntervals) {
+			const intervals: readonly number[] = [
+				Number.NaN,
+				Number.NEGATIVE_INFINITY,
+				0,
+				-42,
+				470.53,
+			];
+			for (const i of intervals) {
 				expect(() => {
 					void new TimeSync({ minimumRefreshIntervalMs: i });
 				}).toThrow(
@@ -418,7 +424,24 @@ describe.concurrent(TimeSync.name, () => {
 		it("Throws when provided a staleness threshold that is neither a positive integer nor zero", ({
 			expect,
 		}) => {
-			expect.hasAssertions();
+			const initialDate = initializeTime();
+			const sync = new TimeSync({ initialDate });
+
+			const intervals: readonly number[] = [
+				Number.NaN,
+				Number.NEGATIVE_INFINITY,
+				Number.POSITIVE_INFINITY,
+				-42,
+				470.53,
+			];
+			for (const i of intervals) {
+				expect(() => {
+					void sync.invalidateState({
+						notificationBehavior: "onChange",
+						stalenessThresholdMs: i,
+					});
+				}).toThrow(RangeError);
+			}
 		});
 
 		it("Supports invalidating state without notifying anything", async ({
