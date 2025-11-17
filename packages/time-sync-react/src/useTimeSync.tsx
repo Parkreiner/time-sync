@@ -25,12 +25,12 @@ const noOp = (..._: readonly unknown[]): void => {};
 export type InitialDate = Date | (() => Date);
 
 /**
- * @todo 2025-08-29 - This isn't 100% correct, but for the initial
+ * @todo 2025-11-17 - This isn't 100% correct, but for the initial
  * implementation, we're going to assume that no one is going to be monkey-
  * patching custom symbol keys or non-enumerable keys onto built-in types (even
  * though this sort of already happens in the standard library)
  *
- * @todo 2025-09-02 - This function doesn't have any cycle detection. That
+ * @todo 2025-11-17 - This function doesn't have any cycle detection. That
  * should be added at some point
  */
 function structuralMerge<T = unknown>(oldValue: T, newValue: T): T {
