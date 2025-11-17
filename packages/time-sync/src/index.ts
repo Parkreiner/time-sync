@@ -1,6 +1,7 @@
 // Not using wildcard syntax to make final exported dependencies more obvious
 export { newReadonlyDate } from "./readonlyDate";
 export {
+	type InvalidateSnapshotOptions,
 	REFRESH_IDLE,
 	REFRESH_ONE_HOUR,
 	REFRESH_ONE_MINUTE,
