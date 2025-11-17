@@ -67,6 +67,10 @@ describe.concurrent.only(newReadonlyDate.name, () => {
 				expected: new Date("January 8, 1940"),
 			},
 			{
+				input: ["2006-11-01T05:00:00.000Z"],
+				expected: new Date("2006-11-01T05:00:00.000Z"),
+			},
+			{
 				input: [2009, 10],
 				expected: new Date("November 1, 2009"),
 			},
