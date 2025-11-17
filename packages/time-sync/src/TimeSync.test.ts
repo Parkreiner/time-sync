@@ -8,10 +8,13 @@ import {
 	type TimeSyncSnapshot,
 } from "./TimeSync";
 
+// Ideally we shouldn't need this, but because Dates often get converted to
+// milliseconds, and JavaScript only has floats, we're using this for direct
+// millisecond comparisons to make sure things never break
+const epsilonThreshold = 0.0001;
+
 // For better or worse, this is a personally meaningful date to me
 const defaultDateString = "October 27, 2025";
-
-const epsilonThreshold = 0.0001;
 
 function initializeTime(dateString: string = defaultDateString): Date {
 	const sourceDate = new Date(dateString);
@@ -37,6 +40,8 @@ afterEach(() => {
 });
 
 describe.concurrent(TimeSync.name, () => {
+	describe("Initialization", () => {});
+
 	describe("Subscriptions: default behavior", () => {
 		it("Never auto-updates state while there are zero subscribers", async ({
 			expect,
@@ -148,6 +153,12 @@ describe.concurrent(TimeSync.name, () => {
 		});
 
 		it("Lets an external system unsubscribe", ({ expect }) => {
+			expect.hasAssertions();
+		});
+
+		it("Turns unsubscribe callback into no-op if called more than once", ({
+			expect,
+		}) => {
 			expect.hasAssertions();
 		});
 
@@ -417,8 +428,17 @@ describe.concurrent(TimeSync.name, () => {
 			expect.hasAssertions();
 		});
 
-		it("Defaults to staleness threshold of 0", ({ expect }) => {
-			expect.hasAssertions();
+		it("Defaults to staleness threshold of 0", async ({ expect }) => {
+			const initialDate = initializeTime();
+			const sync = new TimeSync({ initialDate });
+			const initialSnap = sync.getStateSnapshot();
+
+			// Advance timers to guarantee that there will be some kind of
+			// difference in the dates
+			await vi.advanceTimersByTimeAsync(5000);
+			sync.invalidateState({ notificationBehavior: "onChange" });
+			const newSnap = sync.getStateSnapshot();
+			expect(newSnap).not.toEqual(initialSnap);
 		});
 
 		it("Throws when provided a staleness threshold that is neither a positive integer nor zero", ({
@@ -558,9 +578,13 @@ describe.concurrent(TimeSync.name, () => {
 		});
 	});
 
-	// The intention with the frozen status is that once set on init, there
-	// should be no way to make it un-frozen – a consumer would need to create a
-	// fresh instance from scratch. Not sure how to codify that in tests yet.
+	/**
+	 * @todo 2025-11-17 - The intention with the frozen status is that once set
+	 * on init, there should be no way to make it un-frozen – a consumer would
+	 * need to create a fresh instance from scratch.
+	 *
+	 * Not sure how to codify that in tests yet, but ideally it should be.
+	 */
 	describe("Freezing updates on init", () => {
 		it("Never updates internal state, no matter how many subscribers susbcribe", ({
 			expect,
@@ -577,6 +601,21 @@ describe.concurrent(TimeSync.name, () => {
 
 			const snap = sync.getStateSnapshot();
 			expect(snap.subscriberCount).toBe(0);
+		});
+
+		it("Turns state invalidations into no-ops", ({ expect }) => {
+			const sync = new TimeSync({ freezeUpdates: true });
+			const onUpdate = vi.fn();
+			void sync.subscribe({
+				onUpdate,
+				targetRefreshIntervalMs: REFRESH_ONE_MINUTE,
+			});
+
+			void sync.invalidateState({
+				notificationBehavior: "always",
+				stalenessThresholdMs: 0,
+			});
+			expect(onUpdate).not.toHaveBeenCalled();
 		});
 	});
 });
