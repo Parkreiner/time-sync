@@ -10,7 +10,9 @@ import {
 // For better or worse, this is a personally meaningful date to me
 const defaultDateString = "October 27, 2025";
 
-describe.concurrent.only(TimeSync.name, () => {
+const epsilonThreshold = 0.0001;
+
+describe.concurrent(TimeSync.name, () => {
 	function initializeTime(dateString: string = defaultDateString): Date {
 		const sourceDate = new Date(dateString);
 		vi.setSystemTime(sourceDate);
@@ -54,10 +56,9 @@ describe.concurrent.only(TimeSync.name, () => {
 			expect(newSnap2).toEqual(initialSnap);
 		});
 
-		it("Lets a single external system subscribe to periodic time updates", async ({
-			expect,
-		}) => {
-			const sync = new TimeSync({ initialDate: initializeTime() });
+		it.only("Lets a single system subscribe to updates", async ({ expect }) => {
+			const initialDate = initializeTime();
+			const sync = new TimeSync({ initialDate });
 			const onUpdate = vi.fn();
 
 			for (const rate of sampleLiveRefreshRates) {
@@ -67,17 +68,22 @@ describe.concurrent.only(TimeSync.name, () => {
 				});
 				expect(onUpdate).not.toHaveBeenCalled();
 
+				const snapBefore = sync.getStateSnapshot();
 				await vi.advanceTimersByTimeAsync(rate);
-				const snap = sync.getStateSnapshot();
+				const snapAfter = sync.getStateSnapshot();
 				expect(onUpdate).toHaveBeenCalledTimes(1);
-				expect(onUpdate).toHaveBeenCalledWith(snap);
+				expect(onUpdate).toHaveBeenCalledWith(snapAfter);
+
+				const diff = snapAfter.getMilliseconds() - snapBefore.getMilliseconds();
+				const threshold = Math.abs(diff - rate);
+				expect(threshold).toBeLessThanOrEqual(epsilonThreshold);
 
 				unsub();
 				onUpdate.mockRestore();
 			}
 		});
 
-		it("Lets multiple subscriber subscribe to periodic time updates", ({
+		it("Lets multiple subscribers subscribe to periodic time updates", ({
 			expect,
 		}) => {
 			expect.hasAssertions();
@@ -231,20 +237,50 @@ describe.concurrent.only(TimeSync.name, () => {
 		});
 	});
 
-	describe("Other public methods", () => {
-		it("Lets any external system manually flush the latest state snapshot to all subscribers (for any reason, at any time)", ({
+	describe("Pulling date snapshots", () => {
+		it("Lets external system pull snapshot without subscribing", ({
 			expect,
 		}) => {
 			expect.hasAssertions();
 		});
 
-		it("Lets any external system access the latest date snapshot without subscribing", ({
+		it("Never mutates snapshots", ({ expect }) => {
+			expect.hasAssertions();
+		});
+	});
+
+	describe("Invalidating snapshots", () => {
+		it("Defaults to only notifying subscribers when the snapshot actually changed", ({
 			expect,
 		}) => {
 			expect.hasAssertions();
 		});
 
-		it("Keeps pulled date snapshot over time as other subscribers update it", ({
+		it("Supports invalidating the snapshot without notifying anything", ({
+			expect,
+		}) => {
+			expect.hasAssertions();
+		});
+
+		it("Supports force-notifying subscribers, even if snapshot did not change", ({
+			expect,
+		}) => {
+			expect.hasAssertions();
+		});
+	});
+
+	describe("Behavior when disposing", () => {
+		it("Clears active interval", ({ expect }) => {
+			expect.hasAssertions();
+		});
+
+		it("Automatically unsubscribes everything", ({ expect }) => {
+			expect.hasAssertions();
+		});
+	});
+
+	describe("Freezing updates on init", () => {
+		it("Never updates internal state, no matter how many subscribers susbcribe", ({
 			expect,
 		}) => {
 			expect.hasAssertions();

@@ -18,7 +18,7 @@ type TimeSyncInitOptions = Readonly<{
 	 * frozen for Snapshot tests. Highly encouraged that you use this together
 	 * with `initialDate`.
 	 */
-	isSnapshot: boolean;
+	freezeUpdates: boolean;
 
 	/**
 	 * The minimum refresh interval (in milliseconds) to use when dispatching
@@ -183,7 +183,7 @@ export class TimeSync implements TimeSyncApi {
 
 	constructor(options?: Partial<TimeSyncInitOptions>) {
 		const {
-			isSnapshot = false,
+			freezeUpdates = false,
 			initialDate = new Date(),
 			minimumRefreshIntervalMs = defaultMinimumRefreshIntervalMs,
 		} = options ?? {};
@@ -199,7 +199,7 @@ export class TimeSync implements TimeSyncApi {
 
 		this.#isDisposed = false;
 		this.#hasPendingNotification = false;
-		this.#isFrozen = isSnapshot;
+		this.#isFrozen = freezeUpdates;
 		this.#subscriptions = new Map();
 		this.#latestDateSnapshot = newReadonlyDate(initialDate);
 		this.#fastestRefreshInterval = Number.POSITIVE_INFINITY;
