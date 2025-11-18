@@ -294,12 +294,13 @@ export class TimeSync implements TimeSyncApi {
 		}
 
 		const elapsed =
-			newReadonlyDate().getMilliseconds() -
-			this.#latestSnapshot.dateSnapshot.getMilliseconds();
+			newReadonlyDate().getTime() - this.#latestSnapshot.dateSnapshot.getTime();
 		const timeBeforeNextUpdate = fastest - elapsed;
 
+		// Clear previous interval sight unseen just to be on the safe side
+		clearInterval(this.#intervalId);
+
 		if (timeBeforeNextUpdate <= 0) {
-			clearInterval(this.#intervalId);
 			const updated = this.#updateDateSnapshot();
 			if (updated) {
 				this.#notifyAllSubscriptions();
@@ -309,7 +310,16 @@ export class TimeSync implements TimeSyncApi {
 			return;
 		}
 
-		clearInterval(this.#intervalId);
+		// Most common case for this branch is the very first subscription
+		// getting added, but there's still the small chance that the fastest
+		// interval could change right after an update got flushed
+		if (timeBeforeNextUpdate === fastest) {
+			this.#intervalId = setInterval(this.#onTick, timeBeforeNextUpdate);
+			return;
+		}
+
+		// Otherwise, use interval as pseudo-timeout, and then go back to using
+		// it as a normal interval afterwards
 		this.#intervalId = setInterval(() => {
 			clearInterval(this.#intervalId);
 			this.#intervalId = setInterval(this.#onTick, fastest);
@@ -354,7 +364,7 @@ export class TimeSync implements TimeSyncApi {
 	 * @returns {boolean} Indicates whether the state actually changed.
 	 */
 	#updateDateSnapshot(stalenessThresholdMs = 0): boolean {
-		const { isDisposed, isFrozen, minimumRefreshIntervalMs } =
+		const { isDisposed, isFrozen, dateSnapshot, minimumRefreshIntervalMs } =
 			this.#latestSnapshot;
 		if (isDisposed || isFrozen) {
 			return false;
@@ -362,9 +372,7 @@ export class TimeSync implements TimeSyncApi {
 
 		const newSnap = newReadonlyDate();
 		const exceedsUpdateThreshold =
-			newSnap.getMilliseconds() -
-				this.#latestSnapshot.dateSnapshot.getMilliseconds() <
-			stalenessThresholdMs;
+			newSnap.getTime() - dateSnapshot.getTime() >= stalenessThresholdMs;
 		if (!exceedsUpdateThreshold) {
 			return false;
 		}

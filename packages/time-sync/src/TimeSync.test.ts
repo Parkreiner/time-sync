@@ -2,11 +2,6 @@ import { afterEach, beforeEach, describe, it, vi } from "vitest";
 import { newReadonlyDate } from "./readonlyDate";
 import { refreshRates, type Snapshot, TimeSync } from "./TimeSync";
 
-// Ideally we shouldn't need this, but because Dates often get converted to
-// milliseconds, and JavaScript only has floats, we're using this for direct
-// millisecond comparisons to make sure things never break
-const epsilonThreshold = 0.0001;
-
 // For better or worse, this is a personally meaningful date to me
 const defaultDateString = "October 27, 2025";
 
@@ -38,8 +33,6 @@ afterEach(() => {
 });
 
 describe.concurrent(TimeSync.name, () => {
-	describe("Initialization", () => {});
-
 	describe("Subscriptions: default behavior", () => {
 		it("Never auto-updates state while there are zero subscribers", async ({
 			expect,
@@ -58,13 +51,15 @@ describe.concurrent(TimeSync.name, () => {
 			expect(newSnap2).toEqual(initialSnap);
 		});
 
-		it.only("Lets a single system subscribe to updates", async ({ expect }) => {
-			const initialDate = initializeTime();
-			const sync = new TimeSync({ initialDate });
-			const onUpdate = vi.fn();
-
+		it("Lets a single system subscribe to updates", async ({ expect }) => {
 			for (const rate of sampleLiveRefreshRates) {
-				const unsub = sync.subscribe({
+				// Duplicating all of these calls per iteration to maximize
+				// test isolation
+				const initialDate = initializeTime();
+				const sync = new TimeSync({ initialDate });
+				const onUpdate = vi.fn();
+
+				void sync.subscribe({
 					onUpdate,
 					targetRefreshIntervalMs: rate,
 				});
@@ -76,28 +71,13 @@ describe.concurrent(TimeSync.name, () => {
 				expect(onUpdate).toHaveBeenCalledTimes(1);
 				expect(onUpdate).toHaveBeenCalledWith(dateAfter);
 
-				const diff = dateAfter.getMilliseconds() - dateBefore.getMilliseconds();
-				const threshold = Math.abs(diff - rate);
-				expect(threshold).toBeLessThanOrEqual(epsilonThreshold);
-
-				unsub();
-				onUpdate.mockRestore();
+				const diff = dateAfter.getTime() - dateBefore.getTime();
+				expect(diff).toBe(rate);
+				break;
 			}
 		});
 
 		it("Lets multiple subscribers subscribe to updates", ({ expect }) => {
-			expect.hasAssertions();
-		});
-
-		// This is really important behavior for the React bindings. Those use
-		// useSyncExternalStore under the hood, which require that you always
-		// return out the same value by reference every time React tries to pull
-		// a value from an external state source. Otherwise the hook will keep
-		// pulling the values over and over again until it gives up and throws
-		// a runtime error
-		it("Exposes the exact same date value (by reference) to all subscribers on each update tick", ({
-			expect,
-		}) => {
 			expect.hasAssertions();
 		});
 
@@ -265,6 +245,15 @@ describe.concurrent(TimeSync.name, () => {
 				subscriberCount: 0,
 				minimumRefreshIntervalMs: minimumRefreshIntervalMs,
 			});
+		});
+
+		it("Reflects custom initial date if provided", ({ expect }) => {
+			void initializeTime();
+			const override = new Date("April 1, 1000");
+			const sync = new TimeSync({ initialDate: override });
+
+			const snap = sync.getStateSnapshot();
+			expect(snap.dateSnapshot).toEqual(override);
 		});
 
 		it("Reflects the minimum refresh interval used on init", ({ expect }) => {
