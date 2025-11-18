@@ -1,4 +1,4 @@
-export { refreshRates } from "../../time-sync/src";
+export * from "../../time-sync/src";
 export {
 	type InitialDate,
 	TimeSyncProvider,

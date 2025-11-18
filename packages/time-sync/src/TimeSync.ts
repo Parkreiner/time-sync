@@ -2,7 +2,7 @@ import { newReadonlyDate } from "./readonlyDate";
 import { noOp } from "./utils";
 
 /**
- * A collection of commonly-needed intervals (in milliseconds).
+ * A collection of commonly-needed intervals (all defined in milliseconds).
  */
 export const refreshRates = Object.freeze({
 	paused: Number.POSITIVE_INFINITY,
@@ -67,6 +67,11 @@ export type SubscriptionHandshake = Readonly<{
 	 * added, and it has a non-infinite interval.
 	 */
 	targetRefreshIntervalMs: number;
+
+	/**
+	 * The callback to call when a new state update needs to be flushed amongst
+	 * all subscribers.
+	 */
 	onUpdate: OnTimeSyncUpdate;
 }>;
 
@@ -127,16 +132,17 @@ interface TimeSyncApi {
 	subscribe: (handshake: SubscriptionHandshake) => () => void;
 
 	/**
-	 * Allows any system to pull the latest time state from TimeSync, regardless
-	 * of whether the system is subscribed.
+	 * Allows an external system to pull an immutable snapshot of some of the
+	 * internal state inside TimeSync. The snapshot is frozen at runtime and
+	 * cannot be mutated.
 	 *
-	 * @returns The Date produced from the most recent internal update.
+	 * @returns An object with multiple properties describing the TimeSync.
 	 */
 	getStateSnapshot: () => Snapshot;
 
 	/**
-	 * Immediately tries to refresh the current date snapshot, regardless of
-	 * which refresh intervals have been specified among subscribers.
+	 * Immediately tries to refresh TimeSync's internal state snapshot with
+	 * fresh data like the latest date.
 	 *
 	 * @throws {RangeError} If the provided interval for the
 	 * `stalenessThresholdMs` property is neither a positive integer nor
@@ -158,50 +164,75 @@ type SubscriptionEntry = Readonly<{
 	unsubscribe: () => void;
 }>;
 
-// Defined with explicit type annotation to prevent TypeScript LSP from getting
-// too specific with its type inference. This value should be treated as opaque
-// in most situations.
-const defaultMinimumRefreshIntervalMs: number = 200;
+const defaultMinimumRefreshIntervalMs = 200;
 
 /**
  * TimeSync provides a centralized authority for working with time values in a
  * more structured way, where all dependents for the time values must stay in
- * sync with each other. (e.g., in a React codebase, you want multiple
- * components that rely on time values to update together, to avoid screen
- * tearing and stale data for only some parts of the screen).
+ * sync with each other.
  *
- * By design, there is no way to let a subscriber disable updates. That defeats
- * the goal of needing to keep everything in sync with each other.
- *
- * See comments for exported methods and types for more information.
+ * (e.g., In a React codebase, you want multiple components that rely on time
+ * values to update together, to avoid screen tearing and stale data for only
+ * some parts of the screen.)
  */
 export class TimeSync implements TimeSyncApi {
+	/**
+	 * Indicates whether there has been a de-sync from the TimeSync's internal
+	 * state being updated, and subscribers not yet being notified.
+	 *
+	 * Right now, this is only relevant for when you invalidate the state and
+	 * set the notification behavior to "never".
+	 */
 	#hasPendingBroadcast: boolean;
 
-	// The snapshot should be frozen at runtime. Tried making a private method
-	// for deriving new snapshots by letting you supply partial updates and
-	// merging them with the latest snapshot. But it felt clunky, especially
-	// since some properties on the snapshot currently cannot change at runtime,
-	// but a method would still let them through. There also aren't that many
-	// points where a snapshot can change right now.
+	/**
+	 * An immutable value representation of the TimeSync state that might be
+	 * relevant to an outside consumer.
+	 *
+	 * Should be defined with readonly types AND frozen at runtime to prevent
+	 * the system from falling apart from accidental mutations.
+	 *
+	 * Tried making a private method for deriving new snapshots by letting you
+	 * supply partial updates and merging them with the latest snapshot. But it
+	 * felt clunky, especially since some properties on the snapshot currently
+	 * cannot being able to change at runtime. The method felt like it would
+	 * have more risk of causing bugs by letting properties change when they
+	 * shouldn't. There also aren't that many points where a snapshot can change
+	 * right now.
+	 */
 	#latestSnapshot: Snapshot;
 
-	// Stores all refresh intervals actively associated with an onUpdate
-	// callback (along with their associated unsubscribe callbacks). "Duplicate"
-	// intervals are allowed (in case multiple systems subscribe with the same
-	// interval-callback pairs). Each map value should stay sorted by refresh
-	// interval, in ascending order.
+	/**
+	 * Stores all refresh intervals actively associated with an onUpdate
+	 * callback (along with their associated unsubscribe callbacks).
+	 *
+	 * Supports storing the exact same callback-interval pairs multiple times,
+	 * in case multiple external systems need to subscribe with the exact same
+	 * data concerns. Because the functions themselves are used as keys, that
+	 * ensures that each callback will only be called once per update, no matter
+	 * how subscribers use it.
+	 *
+	 * Each map value should stay sorted by refresh interval, in ascending
+	 * order.
+	 */
 	#subscriptions: Map<OnTimeSyncUpdate, SubscriptionEntry[]>;
 
-	// A cached version of the fastest interval currently registered with
-	// TimeSync. Should always be derived from #subscriptions
+	/**
+	 * A cached version of the fastest interval currently registered with
+	 * TimeSync. Should always be derived from #subscriptions
+	 */
 	#fastestRefreshInterval: number;
 
-	// This class uses setInterval for both its intended purpose and as a janky
-	// version of setTimeout. There are a few times when we need timeout-like
-	// logic, but if we use setInterval for everything, we have fewer IDs to
-	// juggle, and less risk of things getting out of sync. Type defined like
-	// this to support client and server behavior.
+	/**
+	 * Used for both its intended purpose (creating interval), but also as a
+	 * janky version of setTimeout.
+	 *
+	 * There are a few times when we need timeout-like logic, but if we use
+	 * setInterval for everything, we have fewer IDs to juggle, and less risk of
+	 * things getting out of sync.
+	 *
+	 * Type defined like this to support client and server behavior.
+	 */
 	#intervalId: NodeJS.Timeout | number | undefined;
 
 	constructor(options?: Partial<InitOptions>) {
