@@ -10,6 +10,7 @@ export const refreshRates = Object.freeze({
 	idle: Number.POSITIVE_INFINITY,
 	halfSecond: 500 as number,
 	oneSecond: 1000 as number,
+	thirtySeconds: 30_000 as number,
 	oneMinute: 60 * 1000,
 	fiveMinutes: 5 * 60 * 1000,
 	oneHour: 60 * 60 * 1000,

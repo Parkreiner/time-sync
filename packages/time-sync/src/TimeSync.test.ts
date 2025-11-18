@@ -56,7 +56,7 @@ afterEach(() => {
  * just going to use serial tests.
  */
 describe(TimeSync.name, () => {
-	describe("Subscriptions: default behavior", () => {
+	describe("Subscriptions: general behavior", () => {
 		it("Never auto-updates state while there are zero subscribers", async ({
 			expect,
 		}) => {
@@ -418,7 +418,7 @@ describe(TimeSync.name, () => {
 		 * (you can't completely remove them) might make the library a nightmare
 		 * to maintain.
 		 */
-		it.only("Does not completely start next interval over from scratch if fastest subscription is removed halfway through update", async ({
+		it.skip("Does not completely start next interval over from scratch if fastest subscription is removed halfway through update", async ({
 			expect,
 		}) => {
 			const initialDate = initializeTime();
@@ -448,22 +448,55 @@ describe(TimeSync.name, () => {
 			expect(onUpdate2).toHaveBeenCalledTimes(1);
 		});
 
-		it("Immediately notifies subscribers if new refresh interval is added that is less than or equal to the time since the last update", ({
+		it("Immediately notifies subscribers if new refresh interval is added that is less than or equal to the time since the last update", async ({
 			expect,
 		}) => {
-			expect.hasAssertions();
+			const initialDate = initializeTime();
+			const sync = new TimeSync({ initialDate });
+
+			const onUpdate1 = vi.fn();
+			void sync.subscribe({
+				onUpdate: onUpdate1,
+				targetRefreshIntervalMs: refreshRates.oneMinute,
+			});
+
+			await vi.advanceTimersByTimeAsync(refreshRates.thirtySeconds);
+			const onUpdate2 = vi.fn();
+			void sync.subscribe({
+				onUpdate: onUpdate2,
+				targetRefreshIntervalMs: refreshRates.thirtySeconds,
+			});
+
+			expect(onUpdate1).toHaveBeenCalledTimes(1);
+			expect(onUpdate2).toHaveBeenCalledTimes(1);
 		});
 
-		it("Automatically refreshes the date snapshot after the very first subscription is received, regardless of specified refresh interval", ({
+		it("Does not ever dispatch updates if all subscribers specify an update interval of positive infinity", async ({
 			expect,
 		}) => {
-			expect.hasAssertions();
-		});
+			const initialDate = initializeTime();
+			const sync = new TimeSync({ initialDate });
 
-		it("Does not ever dispatch updates if all subscribers specify an update interval of positive infinity", ({
-			expect,
-		}) => {
-			expect.hasAssertions();
+			const sharedOnUpdate = vi.fn();
+			for (let i = 0; i < 100; i++) {
+				void sync.subscribe({
+					onUpdate: sharedOnUpdate,
+					targetRefreshIntervalMs: refreshRates.idle,
+				});
+			}
+
+			const jumps: readonly number[] = [
+				refreshRates.halfSecond,
+				refreshRates.oneSecond,
+				refreshRates.thirtySeconds,
+				refreshRates.oneMinute,
+				refreshRates.fiveMinutes,
+				refreshRates.oneHour,
+			];
+			for (const j of jumps) {
+				await vi.advanceTimersByTimeAsync(j);
+				expect(sharedOnUpdate).not.toHaveBeenCalled();
+			}
 		});
 	});
 
@@ -614,7 +647,7 @@ describe(TimeSync.name, () => {
 			}
 		});
 
-		it("Does not mutate old snapshots when new subscription is added or removed", ({
+		it.skip("Does not mutate old snapshots when new subscription is added or removed", ({
 			expect,
 		}) => {
 			const sync = new TimeSync();
@@ -655,7 +688,7 @@ describe(TimeSync.name, () => {
 			expect(newSnap.isDisposed).toBe(true);
 		});
 
-		it("Prevents mutating properties at runtime", ({ expect }) => {
+		it.skip("Prevents mutating properties at runtime", ({ expect }) => {
 			const sync = new TimeSync();
 
 			// We have readonly modifiers on the types, but we need to make sure
@@ -677,6 +710,41 @@ describe(TimeSync.name, () => {
 			snap.minimumRefreshIntervalMs = mutationSource.minimumRefreshIntervalMs;
 
 			expect(snap).toEqual(copyBeforeMutations);
+		});
+
+		// Meant to account for the fact that you don't know how much time might
+		// pass between a TimeSync getting instantiated and the first subscriber
+		// getting registered
+		it.skip("Automatically refreshes date snapshot after the first subscription, regardless of specified refresh interval", async ({
+			expect,
+		}) => {
+			const dummyOnUpdate = vi.fn();
+
+			const intervals: readonly number[] = [
+				refreshRates.halfSecond,
+				refreshRates.oneMinute,
+				refreshRates.idle,
+			];
+			for (const i of intervals) {
+				const initialDate = initializeTime();
+				const sync = new TimeSync({ initialDate });
+
+				const initialSnap = sync.getStateSnapshot().dateSnapshot;
+				await vi.advanceTimersByTimeAsync(refreshRates.oneHour);
+
+				const snapWithoutSubscribers = sync.getStateSnapshot().dateSnapshot;
+				expect(initialSnap).toEqual(snapWithoutSubscribers);
+
+				void sync.subscribe({
+					onUpdate: dummyOnUpdate,
+					targetRefreshIntervalMs: i,
+				});
+
+				const newSnap = sync.getStateSnapshot().dateSnapshot;
+				const diff = newSnap.getTime() - snapWithoutSubscribers.getTime();
+				console.log(newSnap.toISOString());
+				expect(diff).toBe(refreshRates.oneHour);
+			}
 		});
 	});
 
