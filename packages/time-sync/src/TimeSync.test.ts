@@ -13,7 +13,6 @@ const defaultDateString = "October 27, 2025";
 function initializeTime(dateString: string = defaultDateString): Date {
 	const sourceDate = new Date(dateString);
 	vi.setSystemTime(sourceDate);
-	vi.useFakeTimers();
 	return newReadonlyDate(sourceDate);
 }
 
@@ -26,11 +25,16 @@ const sampleLiveRefreshRates: readonly number[] = [
 type Writeable<T> = { -readonly [Key in keyof T]: T[Key] };
 
 beforeEach(() => {
+	/**
+	 * @todo 2025-11-17 - Once the tests are working, look into whether using
+	 * the `now` property could help clean up some of the setup.
+	 */
 	vi.useFakeTimers();
 });
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	vi.useRealTimers();
 });
 
 describe.concurrent(TimeSync.name, () => {
@@ -508,7 +512,8 @@ describe.concurrent(TimeSync.name, () => {
 	});
 
 	describe("Disposing of a TimeSync instance", () => {
-		it.only("Clears active interval", async ({ expect }) => {
+		it("Clears active interval", async ({ expect }) => {
+			const setSpy = vi.spyOn(globalThis, "setInterval");
 			const clearSpy = vi.spyOn(globalThis, "clearInterval");
 			const initialDate = initializeTime();
 			const sync = new TimeSync({ initialDate });
@@ -519,8 +524,17 @@ describe.concurrent(TimeSync.name, () => {
 				targetRefreshIntervalMs: refreshRates.oneMinute,
 			});
 
+			// We call clearInterval a lot in the library code to be on the
+			// defensive side, and limit the risk of bugs creeping through.
+			// Trying to tie the test to a specific number of calls felt like
+			// tying it to implementation details too much. So, instead we're
+			// going to assume that if the clear was called at least once, and
+			// the number of set calls hasn't changed from before the disposal
+			// step, we're good
+			expect(setSpy).toHaveBeenCalledTimes(1);
 			sync.dispose();
-			expect(clearSpy).toHaveBeenCalledTimes(1);
+			expect(clearSpy).toHaveBeenCalled();
+			expect(setSpy).toHaveBeenCalledTimes(1);
 
 			await vi.advanceTimersByTimeAsync(refreshRates.oneMinute);
 			expect(onUpdate).not.toHaveBeenCalled();

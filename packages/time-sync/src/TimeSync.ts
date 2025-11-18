@@ -4,12 +4,12 @@ import { noOp } from "./utils";
 /**
  * A runtime collection of commonly-needed intervals.
  */
-export const refreshRates = {
+export const refreshRates = Object.freeze({
 	paused: Number.POSITIVE_INFINITY,
 	oneSecond: 1000,
 	oneMinute: 60 * 1000,
 	oneHour: 60 * 60 * 1000,
-} satisfies Record<string, number>;
+}) satisfies Record<string, number>;
 
 export type InitOptions = Readonly<{
 	/**
