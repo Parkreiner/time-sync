@@ -139,6 +139,30 @@ describe(TimeSync.name, () => {
 			expect(snap.subscriberCount).toBe(2);
 		});
 
+		it("Dispatches the same date object (by reference) to all subscribers on update", async ({
+			expect,
+		}) => {
+			const initialDate = initializeTime();
+			const sync = new TimeSync({ initialDate });
+
+			// We use .every later in the test, and it automatically skips over
+			// elements that haven't been explicitly initialized with a value
+			const dateTracker = new Array<Date | null>(10).fill(null);
+			for (let i = 0; i < 10; i++) {
+				void sync.subscribe({
+					targetRefreshIntervalMs: refreshRates.oneSecond,
+					onUpdate: (date) => {
+						dateTracker[i] = date;
+					},
+				});
+			}
+
+			await vi.advanceTimersByTimeAsync(refreshRates.oneSecond);
+			expect(dateTracker[0]).not.toBeNull();
+			const allMatch = dateTracker.every((d) => d === dateTracker[0]);
+			expect(allMatch).toBe(true);
+		});
+
 		it("Dispatches updates to all subscribers based on fastest interval specified", async ({
 			expect,
 		}) => {
@@ -287,10 +311,42 @@ describe(TimeSync.name, () => {
 			}
 		});
 
-		it("Does not fully remove an onUpdate callback if multiple systems use it to subscribe, and only one system unsubscribes", ({
+		it("Does not fully remove an onUpdate callback if multiple systems use it to subscribe, and only one system unsubscribes", async ({
 			expect,
 		}) => {
-			expect.hasAssertions();
+			const initialDate = initializeTime();
+			const sync = new TimeSync({ initialDate });
+			const sharedOnUpdate = vi.fn();
+
+			for (let i = 0; i < 10; i++) {
+				void sync.subscribe({
+					onUpdate: sharedOnUpdate,
+					targetRefreshIntervalMs: refreshRates.oneHour,
+				});
+				void sync.subscribe({
+					onUpdate: sharedOnUpdate,
+					targetRefreshIntervalMs: refreshRates.oneMinute,
+				});
+				void sync.subscribe({
+					onUpdate: sharedOnUpdate,
+					targetRefreshIntervalMs: refreshRates.oneSecond,
+				});
+			}
+
+			const extraOnUpdate = vi.fn();
+			const extraUnsub = sync.subscribe({
+				onUpdate: extraOnUpdate,
+				targetRefreshIntervalMs: refreshRates.oneSecond,
+			});
+
+			const snap1 = sync.getStateSnapshot();
+			expect(snap1.subscriberCount).toBe(31);
+
+			extraUnsub();
+			const snap2 = sync.getStateSnapshot();
+			expect(snap2.subscriberCount).toBe(30);
+			await vi.advanceTimersByTimeAsync(refreshRates.oneSecond);
+			expect(sharedOnUpdate).toHaveBeenCalledTimes(1);
 		});
 
 		it("Slows updates down to the second-fastest interval when the all subscribers for the fastest interval unsubscribe", ({
