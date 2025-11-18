@@ -282,7 +282,7 @@ export class TimeSync implements TimeSyncApi {
 		}
 
 		const elapsed =
-			newReadonlyDate().getTime() -
+			newReadonlyDate().getMilliseconds() -
 			this.#latestSnapshot.dateSnapshot.getMilliseconds();
 		const timeBeforeNextUpdate = fastest - elapsed;
 
