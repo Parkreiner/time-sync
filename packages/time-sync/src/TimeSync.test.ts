@@ -142,13 +142,14 @@ describe(TimeSync.name, () => {
 		it("Dispatches the same date object (by reference) to all subscribers on update", async ({
 			expect,
 		}) => {
+			const testCount = 10;
 			const initialDate = initializeTime();
 			const sync = new TimeSync({ initialDate });
 
 			// We use .every later in the test, and it automatically skips over
 			// elements that haven't been explicitly initialized with a value
-			const dateTracker = new Array<Date | null>(10).fill(null);
-			for (let i = 0; i < 10; i++) {
+			const dateTracker = new Array<Date | null>(testCount).fill(null);
+			for (let i = 0; i < testCount; i++) {
 				void sync.subscribe({
 					targetRefreshIntervalMs: refreshRates.oneSecond,
 					onUpdate: (date) => {

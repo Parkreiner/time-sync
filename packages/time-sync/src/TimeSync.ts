@@ -2,11 +2,13 @@ import { newReadonlyDate } from "./readonlyDate";
 import { noOp } from "./utils";
 
 /**
- * A runtime collection of commonly-needed intervals.
+ * A collection of commonly-needed intervals (in milliseconds).
  */
 export const refreshRates = Object.freeze({
 	paused: Number.POSITIVE_INFINITY,
-	oneSecond: 1000,
+	// Doing type assertion to prevent compiler from over-inferring the type of
+	// this property, and exposing too much info to end users
+	oneSecond: 1000 as number,
 	oneMinute: 60 * 1000,
 	oneHour: 60 * 60 * 1000,
 }) satisfies Record<string, number>;
