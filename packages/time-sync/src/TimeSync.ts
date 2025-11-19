@@ -2,7 +2,7 @@
  * @todo 2025-11-19 - Update TimeSync to work with Temporal objects once those
  * have more adoption.
  */
-import { newReadonlyDate } from "./readonlyDate";
+import { ReadonlyDate } from "./readonlyDate";
 import { noOp } from "./utils";
 
 /**
@@ -70,7 +70,7 @@ export type InitOptions = Readonly<{
 /**
  * The callback to call when a new state update is ready to be dispatched.
  */
-type OnTimeSyncUpdate = (readonlyDateSnapshot: Date) => void;
+type OnTimeSyncUpdate = (snapshot: ReadonlyDate) => void;
 
 export type SubscriptionHandshake = Readonly<{
 	/**
@@ -141,7 +141,7 @@ export type InvalidateStateOptions = Readonly<{
  * value is treated as immutable at both runtime and compile time.
  */
 export type Snapshot = Readonly<{
-	dateSnapshot: Date;
+	dateSnapshot: ReadonlyDate;
 	subscriberCount: number;
 	isFrozen: boolean;
 	isDisposed: boolean;
@@ -320,7 +320,7 @@ export class TimeSync implements TimeSyncApi {
 		this.#latestSnapshot = Object.freeze({
 			minimumRefreshIntervalMs,
 			allowDuplicateFunctionCalls,
-			dateSnapshot: newReadonlyDate(initialDate),
+			dateSnapshot: new ReadonlyDate(initialDate),
 			subscriberCount: 0,
 			isFrozen: freezeUpdates,
 			isDisposed: false,
@@ -399,7 +399,8 @@ export class TimeSync implements TimeSyncApi {
 		}
 
 		const elapsed =
-			newReadonlyDate().getTime() - this.#latestSnapshot.dateSnapshot.getTime();
+			new ReadonlyDate().getTime() -
+			this.#latestSnapshot.dateSnapshot.getTime();
 		const timeBeforeNextUpdate = fastest - elapsed;
 
 		// Clear previous interval sight unseen just to be on the safe side
@@ -474,7 +475,7 @@ export class TimeSync implements TimeSyncApi {
 			return false;
 		}
 
-		const newSnap = newReadonlyDate();
+		const newSnap = new ReadonlyDate();
 		const exceedsUpdateThreshold =
 			newSnap.getTime() - dateSnapshot.getTime() >= stalenessThresholdMs;
 		if (!exceedsUpdateThreshold) {

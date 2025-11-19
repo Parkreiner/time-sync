@@ -1,21 +1,26 @@
-import { afterEach, describe, it, vi } from "vitest";
-import { newReadonlyDate } from "./readonlyDate";
+import { afterEach, beforeEach, describe, it, vi } from "vitest";
+import { ReadonlyDate } from "./readonlyDate";
+
+beforeEach(() => {
+	vi.useFakeTimers();
+});
+
+afterEach(() => {
+	vi.restoreAllMocks();
+});
 
 const defaultDateString = "October 27, 2025";
 
-// newReadonlyDate is mostly being treated as an internal implementation
+// new ReadonlyDate is mostly being treated as an internal implementation
 // detail for the moment, but because we still export it for convenience,
 // we need to make sure that it's 100% interchangeable with native Date
 // objects for all purposes aside from mutations
-describe.concurrent(newReadonlyDate.name, () => {
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
-
+describe(ReadonlyDate.name, () => {
 	// Asserting this first because we rely on this behavior for the other tests
 	it("Supports .toEqual checks against native Dates", ({ expect }) => {
 		const controlDate = new Date(defaultDateString);
-		const readonly = newReadonlyDate(defaultDateString);
+		const readonly = new ReadonlyDate(defaultDateString);
+
 		expect(controlDate).toEqual(readonly);
 	});
 
@@ -92,25 +97,25 @@ describe.concurrent(newReadonlyDate.name, () => {
 		for (const { input, expected } of cases) {
 			// @ts-expect-error -- This should always work at runtime, but the
 			// TypeScript compiler isn't smart enough to figure that out
-			const readonly = newReadonlyDate(...input);
+			const readonly = new ReadonlyDate(...input);
 			expect(readonly).toEqual(expected);
 		}
 
 		const control = new Date(defaultDateString);
 		vi.setSystemTime(control);
-		const withoutArgs = newReadonlyDate();
+		const withoutArgs = new ReadonlyDate();
 		expect(withoutArgs).toEqual(control);
 	});
 
-	it("Can be instantiated via other readonly Dates", ({ expect }) => {
-		const first = newReadonlyDate(defaultDateString);
-		const derived = newReadonlyDate(first);
+	it("Can be instantiated via other ReadonlyDates", ({ expect }) => {
+		const first = new ReadonlyDate(defaultDateString);
+		const derived = new ReadonlyDate(first);
 		expect(first).toEqual(derived);
 	});
 
 	it("Turns all mutation methods into no-ops", ({ expect }) => {
-		const source = newReadonlyDate(defaultDateString);
-		const copyBeforeMutations = newReadonlyDate(source);
+		const source = new ReadonlyDate(defaultDateString);
+		const copyBeforeMutations = new ReadonlyDate(source);
 
 		const setTests: readonly (() => void)[] = [
 			() => source.setDate(4_932_049_023),
@@ -136,27 +141,12 @@ describe.concurrent(newReadonlyDate.name, () => {
 		expect(source).toEqual(copyBeforeMutations);
 	});
 
-	it("Throws on direct property mutations", ({ expect }) => {
-		const mutations: readonly ((d: Date) => void)[] = [
-			(d) => {
-				d.getDate = () => NaN;
-			},
-			(d) => {
-				d.getMonth = () => NaN;
-			},
-			(d) => {
-				d.setDate = () => NaN;
-			},
-		];
+	it("Appears as native Date type for external consumers", ({ expect }) => {
+		const d = new ReadonlyDate();
+		const string = Object.prototype.toString.call(d);
 
-		const normalDate = new Date(defaultDateString);
-		for (const mutate of mutations) {
-			expect(() => mutate(normalDate)).not.toThrow();
-		}
-
-		const readonly = newReadonlyDate(defaultDateString);
-		for (const mutate of mutations) {
-			expect(() => mutate(readonly)).toThrow(TypeError);
-		}
+		expect(d).toBeInstanceOf(Date);
+		expect(string).toBe("[object Date]");
+		expect(d[Symbol.toStringTag]()).toBe("Date");
 	});
 });

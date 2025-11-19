@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, vi } from "vitest";
-import { newReadonlyDate } from "./readonlyDate";
+import { ReadonlyDate } from "./readonlyDate";
 import {
 	type NotificationBehavior,
 	refreshRates,
@@ -10,10 +10,10 @@ import {
 // For better or worse, this is a personally meaningful date to me
 const defaultDateString = "October 27, 2025";
 
-function initializeTime(dateString: string = defaultDateString): Date {
-	const sourceDate = new Date(dateString);
+function initializeTime(dateString: string = defaultDateString): ReadonlyDate {
+	const sourceDate = new ReadonlyDate(dateString);
 	vi.setSystemTime(sourceDate);
-	return newReadonlyDate(sourceDate);
+	return sourceDate;
 }
 
 beforeEach(() => {
@@ -769,7 +769,7 @@ describe(TimeSync.name, () => {
 			const snap = sync.getStateSnapshot() as Writeable<Snapshot>;
 			const copyBeforeMutations = { ...snap };
 			const mutationSource: Snapshot = {
-				dateSnapshot: newReadonlyDate("April 1, 1970"),
+				dateSnapshot: new ReadonlyDate("April 1, 1970"),
 				isDisposed: true,
 				isFrozen: true,
 				minimumRefreshIntervalMs: Number.POSITIVE_INFINITY,
