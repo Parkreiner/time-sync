@@ -2,43 +2,57 @@ import { describe, it } from "vitest";
 import { useTimeSync, useTimeSyncRef } from "./useTimeSync";
 
 describe.concurrent(useTimeSyncRef.name, () => {
-	describe("General behavior", () => {
-		it.todo("Throws if mounted outside of a TimeSyncProvider", ({ expect }) => {
-			expect.hasAssertions();
-		});
+	it.skip("Throws if mounted outside of a TimeSyncProvider", ({ expect }) => {
+		expect.hasAssertions();
+	});
+
+	it.skip("Lets a component subscribe from inside a side effect", ({
+		expect,
+	}) => {
+		expect.hasAssertions();
+	});
+
+	it.skip("Lets a component get a state snapshot from inside a side effect", ({
+		expect,
+	}) => {
+		expect.hasAssertions();
+	});
+
+	it.skip("Lets a component invalidate state from inside a side effect", ({
+		expect,
+	}) => {
+		expect.hasAssertions();
 	});
 });
 
 describe.concurrent(useTimeSync.name, () => {
 	describe("General behavior", () => {
-		it.todo("Throws if mounted outside of a TimeSyncProvider", ({ expect }) => {
+		it.skip("Throws if mounted outside of a TimeSyncProvider", ({ expect }) => {
 			expect.hasAssertions();
 		});
 	});
 
 	describe("Single consumer", () => {
 		describe("No transformation callback", () => {
-			it.todo("Returns a new Date synchronously on mount", ({ expect }) => {
+			it.skip("Returns a new Date synchronously on mount", ({ expect }) => {
 				expect.hasAssertions();
 			});
 		});
 
 		describe("With transformation callback", () => {
-			it.todo(
-				"Returns callback result synchronously on mount",
-				({ expect }) => {
-					expect.hasAssertions();
-				},
-			);
+			it.skip("Returns callback result synchronously on mount", ({
+				expect,
+			}) => {
+				expect.hasAssertions();
+			});
 		});
 	});
 
 	describe("Multiple consumers on screen at same time", () => {
-		it.todo(
-			"Refreshes previous consumers when new consumer mounts",
-			({ expect }) => {
-				expect.hasAssertions();
-			},
-		);
+		it.skip("Refreshes previous consumers when new consumer mounts", ({
+			expect,
+		}) => {
+			expect.hasAssertions();
+		});
 	});
 });
