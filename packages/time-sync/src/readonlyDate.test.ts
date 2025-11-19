@@ -20,7 +20,6 @@ describe(ReadonlyDate.name, () => {
 	it("Supports .toEqual checks against native Dates", ({ expect }) => {
 		const controlDate = new Date(defaultDateString);
 		const readonly = new ReadonlyDate(defaultDateString);
-
 		expect(controlDate).toEqual(readonly);
 	});
 
