@@ -197,9 +197,7 @@ export class ReadonlyDate extends Date implements ReadonlyDateApi {
 	 * Manually overriding the symbol method means that we can trick Vitest into
 	 * processing readonly dates as native dates for testing. This technically
 	 * does creep into the behavior exposed to end users, but most users are
-	 * going to use instanceof, and that works in both of these checks:
-	 * 1. value instanceof ReadonlyDate
-	 * 2. value instanceof Date
+	 * going to use instanceof
 	 */
 	[Symbol.toStringTag](): string {
 		return "Date";
