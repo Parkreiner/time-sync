@@ -24,26 +24,6 @@ describe(ReadonlyDate.name, () => {
 		expect(controlDate).toEqual(readonly);
 	});
 
-	/**
-	 * @todo 2025-11-16 - Need to figure out why, but for some reason, sometimes
-	 * when you create an expected native Date via an ISO string, all
-	 * comparisons against it and a readonly Date fail with a TypeError. The
-	 * error message is cryptic, but mentions a bad property access for the
-	 * .toISOString method (presumably on the readonly date).
-	 *
-	 * Having trouble reproducing this error – seems very flaky.
-	 *
-	 * Calling .toISOString on the readonly date still works, so this might be
-	 * some weird nuance from how Vitest's utility functions work.
-	 *
-	 * Current investigations point towards this being a case where native Dates
-	 * have weird interactions with proxy objects
-	 * @see {@link https://community.n8n.io/t/method-date-prototype-toisostring-called-on-incompatible-receiver-object-date/24541}
-	 *
-	 * This behavior has a chance of affecting users, but it's being
-	 * de-prioritized for the initial launch, because it should hopefully be a
-	 * niche issue.
-	 */
 	it("Mirrors type signature of native Dates", ({ expect }) => {
 		// Have to save the version without arguments for last, because it
 		// requires the most mocking, and has a risk of breaking the other cases
