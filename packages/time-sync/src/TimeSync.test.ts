@@ -68,15 +68,15 @@ describe(TimeSync.name, () => {
 		}) => {
 			const initialDate = initializeTime();
 			const sync = new TimeSync({ initialDate });
-			const initialSnap = sync.getStateSnapshot().dateSnapshot;
+			const initialSnap = sync.getStateSnapshot().date;
 			expect(initialSnap).toEqual(initialDate);
 
 			await vi.advanceTimersByTimeAsync(5 * refreshRates.oneSecond);
-			const newSnap1 = sync.getStateSnapshot().dateSnapshot;
+			const newSnap1 = sync.getStateSnapshot().date;
 			expect(newSnap1).toEqual(initialSnap);
 
 			await vi.advanceTimersByTimeAsync(500 * refreshRates.oneSecond);
-			const newSnap2 = sync.getStateSnapshot().dateSnapshot;
+			const newSnap2 = sync.getStateSnapshot().date;
 			expect(newSnap2).toEqual(initialSnap);
 		});
 
@@ -99,9 +99,9 @@ describe(TimeSync.name, () => {
 				});
 				expect(onUpdate).not.toHaveBeenCalled();
 
-				const dateBefore = sync.getStateSnapshot().dateSnapshot;
+				const dateBefore = sync.getStateSnapshot().date;
 				await vi.advanceTimersByTimeAsync(rate);
-				const dateAfter = sync.getStateSnapshot().dateSnapshot;
+				const dateAfter = sync.getStateSnapshot().date;
 				expect(onUpdate).toHaveBeenCalledTimes(1);
 				expect(onUpdate).toHaveBeenCalledWith(dateAfter);
 
@@ -579,7 +579,7 @@ describe(TimeSync.name, () => {
 
 			const snap = sync.getStateSnapshot();
 			expect(snap).toEqual<Snapshot>({
-				dateSnapshot: initialDate,
+				date: initialDate,
 				isDisposed: false,
 				isFrozen: false,
 				subscriberCount: 0,
@@ -594,7 +594,7 @@ describe(TimeSync.name, () => {
 			const sync = new TimeSync({ initialDate: override });
 
 			const snap = sync.getStateSnapshot();
-			expect(snap.dateSnapshot).toEqual(override);
+			expect(snap.date).toEqual(override);
 		});
 
 		it("Reflects the minimum refresh interval used on init", ({ expect }) => {
@@ -769,7 +769,7 @@ describe(TimeSync.name, () => {
 			const snap = sync.getStateSnapshot() as Writeable<Snapshot>;
 			const copyBeforeMutations = { ...snap };
 			const mutationSource: Snapshot = {
-				dateSnapshot: new ReadonlyDate("April 1, 1970"),
+				date: new ReadonlyDate("April 1, 1970"),
 				isDisposed: true,
 				isFrozen: true,
 				minimumRefreshIntervalMs: Number.POSITIVE_INFINITY,
@@ -779,7 +779,7 @@ describe(TimeSync.name, () => {
 
 			const mutations: readonly (() => void)[] = [
 				() => {
-					snap.dateSnapshot = mutationSource.dateSnapshot;
+					snap.date = mutationSource.date;
 				},
 				() => {
 					snap.isDisposed = mutationSource.isDisposed;
@@ -813,30 +813,58 @@ describe(TimeSync.name, () => {
 			expect,
 		}) => {
 			const dummyOnUpdate = vi.fn();
-
 			const intervals: readonly number[] = [
 				refreshRates.halfSecond,
 				refreshRates.oneMinute,
 				refreshRates.idle,
 			];
+
+			// Go from fresh instance to first subscriber
 			for (const i of intervals) {
 				const initialDate = initializeTime();
 				const sync = new TimeSync({ initialDate });
+				const initialSnap = sync.getStateSnapshot().date;
 
-				const initialSnap = sync.getStateSnapshot().dateSnapshot;
 				await vi.advanceTimersByTimeAsync(refreshRates.oneHour);
-
-				const snapWithoutSubscribers = sync.getStateSnapshot().dateSnapshot;
-				expect(initialSnap).toEqual(snapWithoutSubscribers);
+				const freshWithoutSub = sync.getStateSnapshot().date;
+				expect(initialSnap).toEqual(freshWithoutSub);
 
 				void sync.subscribe({
 					onUpdate: dummyOnUpdate,
 					targetRefreshIntervalMs: i,
 				});
 
-				const newSnap = sync.getStateSnapshot().dateSnapshot;
-				const diff = newSnap.getTime() - snapWithoutSubscribers.getTime();
-				expect(diff).toBe(refreshRates.oneHour);
+				const freshWithSub = sync.getStateSnapshot().date;
+				const diff1 = freshWithSub.getTime() - freshWithoutSub.getTime();
+				expect(diff1).toBe(refreshRates.oneHour);
+			}
+
+			// Go from 0 to 1 for already-used instance
+			for (const i of intervals) {
+				const initialDate = initializeTime();
+				const sync = new TimeSync({ initialDate });
+
+				// Set up subscription and then immediately revoke it
+				const unsub = sync.subscribe({
+					onUpdate: dummyOnUpdate,
+					targetRefreshIntervalMs: i,
+				});
+				unsub();
+				const initialSnap = sync.getStateSnapshot().date;
+
+				await vi.advanceTimersByTimeAsync(refreshRates.oneHour);
+				const usedWithoutSub = sync.getStateSnapshot().date;
+				const diff2 = usedWithoutSub.getTime() - initialSnap.getTime();
+				expect(diff2).toBe(refreshRates.oneHour);
+
+				void sync.subscribe({
+					onUpdate: dummyOnUpdate,
+					targetRefreshIntervalMs: i,
+				});
+
+				const usedWithSub = sync.getStateSnapshot().date;
+				const diff3 = usedWithSub.getTime() - usedWithoutSub.getTime();
+				expect(diff3).toBe(refreshRates.oneHour);
 			}
 		});
 	});
@@ -1017,7 +1045,7 @@ describe(TimeSync.name, () => {
 
 			const newSnap = sync.getStateSnapshot();
 			expect(newSnap).not.toEqual(initialSnap);
-			expect(newSnap.dateSnapshot).toEqual(ejectedDate);
+			expect(newSnap.date).toEqual(ejectedDate);
 		});
 	});
 
@@ -1120,7 +1148,7 @@ describe(TimeSync.name, () => {
 
 			const snap = sync.getStateSnapshot();
 			expect(snap.subscriberCount).toBe(0);
-			expect(snap.dateSnapshot).toEqual(initialDate);
+			expect(snap.date).toEqual(initialDate);
 		});
 
 		it("Turns state invalidations into no-ops", ({ expect }) => {
