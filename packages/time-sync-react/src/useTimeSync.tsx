@@ -13,7 +13,7 @@ import React, {
 	useState,
 	useSyncExternalStore,
 } from "react";
-import { newReadonlyDate, TimeSync } from "../../time-sync/src";
+import { ReadonlyDate, TimeSync } from "../../time-sync/src";
 import { useEffectEvent as polyfill } from "./useEffectEventPolyfill";
 
 const useEffectEvent: typeof polyfill =
@@ -132,7 +132,7 @@ function structuralMerge<T = unknown>(oldValue: T, newValue: T): T {
 
 type ReactTimeSyncInitOptions = Readonly<{
 	initialDate: Date | (() => Date);
-	isSnapshot: boolean;
+	freezeUpdates: boolean;
 }>;
 
 type TransformCallback<T> = (
@@ -153,6 +153,12 @@ type TransformationEntry = {
 };
 
 /**
+ * A version of TimeSync that deliberately hides the dispose method to prevent
+ * the app from accidentally blowing up.
+ */
+type TimeSyncWithoutDispose = Readonly<Omit<TimeSync, "dispose">>;
+
+/**
  * The main conceit for this file is that all of the core state is stored in a
  * global-ish instance of ReactTimeSync, and then useTimeSync and
  * useTimeSyncRef control the class via React hooks and lifecycle behavior.
@@ -168,6 +174,7 @@ class ReactTimeSync {
 	// function component should have different IDs)
 	readonly #entries: Map<string, TransformationEntry>;
 	readonly #timeSync: TimeSync;
+	readonly #timeSyncWithoutDispose: TimeSyncWithoutDispose;
 
 	#isProviderMounted: boolean;
 	#invalidationIntervalId: NodeJS.Timeout | number | undefined;
@@ -195,14 +202,20 @@ class ReactTimeSync {
 	#batchMountUpdateId: number | undefined;
 
 	constructor(options?: Partial<ReactTimeSyncInitOptions>) {
-		const { initialDate: init, isSnapshot } = options ?? {};
+		const { initialDate: init, freezeUpdates } = options ?? {};
+		const initialDate = typeof init === "function" ? init() : init;
 
 		this.#isProviderMounted = true;
 		this.#invalidationIntervalId = undefined;
 		this.#entries = new Map();
 
-		const initialDate = typeof init === "function" ? init() : init;
-		this.#timeSync = new TimeSync({ initialDate, freezeUpdates: isSnapshot });
+		const sync = new TimeSync({ initialDate, freezeUpdates });
+		this.#timeSync = sync;
+		this.#timeSyncWithoutDispose = {
+			subscribe: (handshake) => sync.subscribe(handshake),
+			getStateSnapshot: () => sync.getStateSnapshot(),
+			invalidateState: (options) => sync.invalidateState(options),
+		};
 	}
 
 	// Only safe to call inside a render that is bound to useSyncExternalStore
@@ -214,6 +227,10 @@ class ReactTimeSync {
 	// Always safe to call inside a render
 	getTimeSync(): TimeSync {
 		return this.#timeSync;
+	}
+
+	getTimeSyncWithoutDispose(): TimeSyncWithoutDispose {
+		return this.#timeSyncWithoutDispose;
 	}
 
 	subscribe(rsh: ReactSubscriptionHandshake): () => void {
@@ -276,7 +293,7 @@ class ReactTimeSync {
 		// Regardless of how the subscription happened, update all other
 		// subscribers to get them in sync with the newest state
 		const shouldInvalidateDate =
-			newReadonlyDate().getTime() -
+			new ReadonlyDate().getTime() -
 				this.#timeSync.getStateSnapshot().dateSnapshot.getTime() >
 			ReactTimeSync.#stalenessThresholdMs;
 		if (shouldInvalidateDate) {
@@ -408,17 +425,17 @@ function useReactTimeSync(): ReactTimeSync {
 
 type TimeSyncProviderProps = Readonly<{
 	initialDate?: InitialDate;
-	isSnapshot?: boolean;
+	freezeUpdates?: boolean;
 	children?: ReactNode;
 }>;
 
 export const TimeSyncProvider: FC<TimeSyncProviderProps> = ({
 	children,
 	initialDate,
-	isSnapshot = false,
+	freezeUpdates = false,
 }) => {
 	const [readonlyReactTs] = useState(() => {
-		return new ReactTimeSync({ initialDate, isSnapshot });
+		return new ReactTimeSync({ initialDate, freezeUpdates: freezeUpdates });
 	});
 
 	// This is a super, super niche use case, but we need to make ensure the
@@ -438,8 +455,6 @@ export const TimeSyncProvider: FC<TimeSyncProviderProps> = ({
 	);
 };
 
-type TimeSyncWithoutDispose = Readonly<Omit<TimeSync, "dispose">>;
-
 /**
  * Provides direct access to the TimeSync instance being dependency-injected
  * throughout the React application. It functions as ref state – most of its
@@ -452,22 +467,7 @@ type TimeSyncWithoutDispose = Readonly<Omit<TimeSync, "dispose">>;
  */
 export function useTimeSyncRef(): TimeSyncWithoutDispose {
 	const reactTs = useReactTimeSync();
-
-	// We could just return the sync directly, and that would still satisfy the
-	// type contract for the without version. But then there would be a mismatch
-	// between the types and runtime logic, and we'd be praying that the types
-	// would be enough to prevent pitfalls. Just making a wrapper that manually
-	// strips out dispose to be on the safe side
-	const without = useMemo<TimeSyncWithoutDispose>(() => {
-		const sync = reactTs.getTimeSync();
-		return {
-			getStateSnapshot: () => sync.getStateSnapshot(),
-			invalidateState: (options) => sync.invalidateState(options),
-			subscribe: (handshake) => sync.subscribe(handshake),
-		};
-	}, [reactTs]);
-
-	return without;
+	return reactTs.getTimeSyncWithoutDispose();
 }
 
 // Even though this is a really simple function, keeping it defined outside
