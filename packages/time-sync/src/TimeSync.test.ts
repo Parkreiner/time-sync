@@ -7,8 +7,6 @@ import {
 	TimeSync,
 } from "./TimeSync";
 
-type Writeable<T> = { -readonly [Key in keyof T]: T[Key] };
-
 // For better or worse, this is a personally meaningful date to me
 const defaultDateString = "October 27, 2025";
 
@@ -426,7 +424,7 @@ describe(TimeSync.name, () => {
 		 * (you can't completely remove them) might make the library a nightmare
 		 * to maintain.
 		 */
-		it.skip("Does not completely start next interval over from scratch if fastest subscription is removed halfway through update", async ({
+		it("Does not completely start next interval over from scratch if fastest subscription is removed halfway through update", async ({
 			expect,
 		}) => {
 			const initialDate = initializeTime();
@@ -658,6 +656,30 @@ describe(TimeSync.name, () => {
 			expect(newSnap).not.toEqual(initialSnap);
 		});
 
+		it.skip("Does not mutate old snapshots when new subscription is added or removed", ({
+			expect,
+		}) => {
+			const sync = new TimeSync();
+			const initialSnap = sync.getStateSnapshot();
+
+			const unsub = sync.subscribe({
+				targetRefreshIntervalMs: refreshRates.oneHour,
+				onUpdate: vi.fn(),
+			});
+			const afterAdd = sync.getStateSnapshot();
+			expect(afterAdd.subscriberCount).toBe(1);
+			expect(afterAdd).not.toBe(initialSnap);
+			expect(afterAdd).not.toEqual(initialSnap);
+
+			unsub();
+			const afterRemove = sync.getStateSnapshot();
+			expect(afterRemove.subscriberCount).toBe(0);
+			expect(afterRemove).not.toBe(initialSnap);
+			expect(afterRemove).not.toEqual(initialSnap);
+			expect(afterRemove).not.toBe(afterAdd);
+			expect(afterRemove).not.toEqual(afterAdd);
+		});
+
 		it("Provides accurate count of active subscriptions as it changes over time", ({
 			expect,
 		}) => {
@@ -675,27 +697,6 @@ describe(TimeSync.name, () => {
 				const newSnap = sync.getStateSnapshot();
 				expect(newSnap.subscriberCount).toBe(i);
 			}
-		});
-
-		it.skip("Does not mutate old snapshots when new subscription is added or removed", ({
-			expect,
-		}) => {
-			const sync = new TimeSync();
-			const initialSnap = sync.getStateSnapshot();
-
-			const unsub = sync.subscribe({
-				targetRefreshIntervalMs: refreshRates.oneHour,
-				onUpdate: vi.fn(),
-			});
-			const afterAdd = sync.getStateSnapshot();
-			expect(afterAdd.subscriberCount).toBe(1);
-			expect(afterAdd).not.toEqual(initialSnap);
-
-			unsub();
-			const afterRemove = sync.getStateSnapshot();
-			expect(afterRemove.subscriberCount).toBe(0);
-			expect(afterRemove).not.toEqual(initialSnap);
-			expect(afterRemove).not.toEqual(afterAdd);
 		});
 
 		it("Indicates frozen status", ({ expect }) => {
@@ -728,7 +729,8 @@ describe(TimeSync.name, () => {
 			expect(frozenSnap.allowDuplicateFunctionCalls).toBe(true);
 		});
 
-		it.skip("Prevents mutating properties at runtime", ({ expect }) => {
+		it("Prevents mutating properties at runtime", ({ expect }) => {
+			type Writeable<T> = { -readonly [Key in keyof T]: T[Key] };
 			const sync = new TimeSync();
 
 			// We have readonly modifiers on the types, but we need to make sure
@@ -744,21 +746,39 @@ describe(TimeSync.name, () => {
 				allowDuplicateFunctionCalls: false,
 			};
 
-			snap.dateSnapshot = mutationSource.dateSnapshot;
-			snap.isDisposed = mutationSource.isDisposed;
-			snap.isFrozen = mutationSource.isFrozen;
-			snap.subscriberCount = mutationSource.subscriberCount;
-			snap.minimumRefreshIntervalMs = mutationSource.minimumRefreshIntervalMs;
-			snap.allowDuplicateFunctionCalls =
-				mutationSource.allowDuplicateFunctionCalls;
+			const mutations: readonly (() => void)[] = [
+				() => {
+					snap.dateSnapshot = mutationSource.dateSnapshot;
+				},
+				() => {
+					snap.isDisposed = mutationSource.isDisposed;
+				},
+				() => {
+					snap.isFrozen = mutationSource.isFrozen;
+				},
+				() => {
+					snap.subscriberCount = mutationSource.subscriberCount;
+				},
+				() => {
+					snap.minimumRefreshIntervalMs =
+						mutationSource.minimumRefreshIntervalMs;
+				},
+				() => {
+					snap.allowDuplicateFunctionCalls =
+						mutationSource.allowDuplicateFunctionCalls;
+				},
+			];
+			for (const m of mutations) {
+				expect(m).toThrow(TypeError);
+			}
 
 			expect(snap).toEqual(copyBeforeMutations);
 		});
 
 		// Meant to account for the fact that you don't know how much time might
 		// pass between a TimeSync getting instantiated and the first subscriber
-		// getting registered
-		it.skip("Automatically refreshes date snapshot after the first subscription, regardless of specified refresh interval", async ({
+		// getting registered. But it's also meant to catch
+		it("Automatically refreshes date snapshot when going from 0 to 1 subscribers, regardless of specified refresh interval", async ({
 			expect,
 		}) => {
 			const dummyOnUpdate = vi.fn();
