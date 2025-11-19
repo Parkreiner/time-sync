@@ -86,12 +86,6 @@ describe(ReadonlyDate.name, () => {
 		expect(withoutArgs).toEqual(control);
 	});
 
-	it("Can be instantiated via other ReadonlyDates", ({ expect }) => {
-		const first = new ReadonlyDate(defaultDateString);
-		const derived = new ReadonlyDate(first);
-		expect(first).toEqual(derived);
-	});
-
 	it("Turns all mutation methods into no-ops", ({ expect }) => {
 		const source = new ReadonlyDate(defaultDateString);
 		const copyBeforeMutations = new ReadonlyDate(source);
@@ -118,6 +112,21 @@ describe(ReadonlyDate.name, () => {
 		}
 
 		expect(source).toEqual(copyBeforeMutations);
+	});
+
+	it("Can be instantiated via other ReadonlyDates", ({ expect }) => {
+		const first = new ReadonlyDate(defaultDateString);
+		const derived = new ReadonlyDate(first);
+		expect(first).toEqual(derived);
+	});
+
+	it("Can be converted to a native date", ({ expect }) => {
+		const d = new ReadonlyDate("February 5, 1770");
+		const converted = d.toNativeDate();
+
+		expect(d).toEqual(converted);
+		expect(converted).toBeInstanceOf(Date);
+		expect(converted).not.toBeInstanceOf(ReadonlyDate);
 	});
 
 	it("Appears as native Date type for external consumers", ({ expect }) => {

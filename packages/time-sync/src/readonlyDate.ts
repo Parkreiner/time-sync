@@ -29,8 +29,10 @@
  * Any extra methods for readonly dates.
  */
 interface ReadonlyDateApi {
-	/** Converts a readonly date into a native (mutable) date. */
-	toDate(): Date;
+	/**
+	 * Converts a readonly date into a native (mutable) date.
+	 */
+	toNativeDate(): Date;
 }
 
 /**
@@ -40,7 +42,7 @@ interface ReadonlyDateApi {
  * removed.
  *
  * If you need a mutable version of the underlying date, ReadonlyDate exposes a
- * .toDate method to do a runtime conversion to a native/mutable date.
+ * .toNativeDate method to do a runtime conversion to a native/mutable date.
  */
 export class ReadonlyDate extends Date implements ReadonlyDateApi {
 	// Very chaotic type signature, but that's an artifact of how wonky the
@@ -79,7 +81,8 @@ export class ReadonlyDate extends Date implements ReadonlyDateApi {
 		/**
 		 * This guard clause looks incredibly silly, but we need to do this to
 		 * make sure that the readonly class works properly with Jest, Vitest,
-		 * and anything else that supports fake timers.
+		 * and anything else that supports fake timers. Critically, it makes
+		 * this possible without introducing any extra runtime dependencies.
 		 *
 		 * Basically:
 		 * 1. We need to make sure that ReadonlyDate is linked to the Date
@@ -201,12 +204,7 @@ export class ReadonlyDate extends Date implements ReadonlyDateApi {
 		return "Date";
 	}
 
-	toDate(): Date {
-		// While you can do property accesses on super, which makes it look like
-		// an object, it's technically not an object itself, so you can't use
-		// super as a standalone value. We have to use super to pull a concrete
-		// value from the underlying date in the prototype chain, and then make
-		// a new date from that.
+	toNativeDate(): Date {
 		const time = super.getTime();
 		return new Date(time);
 	}
