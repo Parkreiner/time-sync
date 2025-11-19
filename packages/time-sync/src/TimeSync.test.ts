@@ -806,7 +806,7 @@ describe(TimeSync.name, () => {
 			expect(onUpdate).toHaveBeenCalledTimes(1);
 		});
 
-		it.only("Accepts custom staleness threshold for onChange behavior", async ({
+		it("Accepts custom staleness threshold for onChange behavior", async ({
 			expect,
 		}) => {
 			const initialDate = initializeTime();
@@ -823,7 +823,7 @@ describe(TimeSync.name, () => {
 			expect(onUpdate).not.toHaveBeenCalled();
 			sync.invalidateState({
 				notificationBehavior: "onChange",
-				stalenessThresholdMs: refreshRates.oneHour,
+				stalenessThresholdMs: refreshRates.oneMinute,
 			});
 			expect(onUpdate).toHaveBeenCalledTimes(1);
 		});

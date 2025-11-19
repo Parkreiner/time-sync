@@ -7,7 +7,15 @@ import { noOp } from "./utils";
 // Doing type assertion on the static numeric values to prevent compiler from
 // over-inferring the types, and exposing too much info to end users
 export const refreshRates = Object.freeze({
+	/**
+	 * Indicates that a subscriber does not strictly need updates, but is still
+	 * allowed to be updated if it would keep it in sync with other subscribers.
+	 *
+	 * If all subscribers use this update interval, TimeSync will never dispatch
+	 * any updates.
+	 */
 	idle: Number.POSITIVE_INFINITY,
+
 	halfSecond: 500 as number,
 	oneSecond: 1000 as number,
 	thirtySeconds: 30_000 as number,
