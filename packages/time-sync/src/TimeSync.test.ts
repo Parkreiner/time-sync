@@ -656,7 +656,7 @@ describe(TimeSync.name, () => {
 			expect(newSnap).not.toEqual(initialSnap);
 		});
 
-		it.skip("Does not mutate old snapshots when new subscription is added or removed", ({
+		it("Does not mutate old snapshots when new subscription is added or removed", ({
 			expect,
 		}) => {
 			const sync = new TimeSync();
@@ -674,10 +674,41 @@ describe(TimeSync.name, () => {
 			unsub();
 			const afterRemove = sync.getStateSnapshot();
 			expect(afterRemove.subscriberCount).toBe(0);
-			expect(afterRemove).not.toBe(initialSnap);
-			expect(afterRemove).not.toEqual(initialSnap);
 			expect(afterRemove).not.toBe(afterAdd);
 			expect(afterRemove).not.toEqual(afterAdd);
+			expect(afterRemove).not.toBe(initialSnap);
+
+			/**
+			 * @todo 2025-11-19 - Accidentally made a typo that isn't relevant
+			 * to the tests, but does surface a problem with how readonly dates
+			 * are defined via the proxy object
+			 *
+			 * If you add a .not here, Vitest's pretty-format package breaks
+			 * from trying to call the .toISOString method.
+			 *
+			 * The relevant code seems to be here
+			 * @see {@link https://github.com/vitest-dev/vitest/blob/4f58c77147796d48bf70579222a577df977300f8/packages/pretty-format/src/index.ts#L50}
+			 *
+			 * Maybe there's a way that pretty-format could be patched to remove
+			 * this risk, but the deeper problem seems to be that if you run
+			 * this vanilla JS code, you get the same issue:
+			 *
+			 * ```ts
+			 * const date = newReadonlyDate();
+			 * const toISOString = Date.prototype.toISOString;
+			 * toISOString.call(date);
+			 * ```
+			 *
+			 * This should be a niche issue for users, since most developers
+			 * don't even know that Function.prototype.call even exists
+			 * nowadays, but it should be fixed to maximize interoperability
+			 * with Vitest
+			 *
+			 * There is a risk that this behavior could break tests in the
+			 * future, and the bigger problem is that the runtime error is bad
+			 * enough that it actually blows up the Vitest runner itself.
+			 */
+			expect(afterRemove).toEqual(initialSnap);
 		});
 
 		it("Provides accurate count of active subscriptions as it changes over time", ({
