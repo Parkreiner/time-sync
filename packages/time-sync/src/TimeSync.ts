@@ -58,12 +58,12 @@ export type InitOptions = Readonly<{
 	minimumRefreshIntervalMs: number;
 
 	/**
-	 * Indicates whether the same callback (by reference) should be called
-	 * multiple time if registered by multiple systems.
+	 * Indicates whether the same `onUpdate` callback (by reference) should be
+	 * called multiple time if registered by multiple systems.
 	 *
 	 * Defaults to false.
 	 */
-	allowDuplicateFunctionCalls: boolean;
+	allowDuplicateOnUpdateCalls: boolean;
 }>;
 
 /**
@@ -145,7 +145,7 @@ export type Snapshot = Readonly<{
 	isFrozen: boolean;
 	isDisposed: boolean;
 	minimumRefreshIntervalMs: number;
-	allowDuplicateFunctionCalls: boolean;
+	allowDuplicateOnUpdateCalls: boolean;
 }>;
 
 interface TimeSyncApi {
@@ -299,7 +299,7 @@ export class TimeSync implements TimeSyncApi {
 		const {
 			initialDate,
 			freezeUpdates = false,
-			allowDuplicateFunctionCalls = false,
+			allowDuplicateOnUpdateCalls = false,
 			minimumRefreshIntervalMs = defaultMinimumRefreshIntervalMs,
 		} = options ?? {};
 
@@ -319,7 +319,7 @@ export class TimeSync implements TimeSyncApi {
 
 		this.#latestSnapshot = Object.freeze({
 			minimumRefreshIntervalMs,
-			allowDuplicateFunctionCalls,
+			allowDuplicateOnUpdateCalls,
 			subscriberCount: 0,
 			isFrozen: freezeUpdates,
 			isDisposed: false,
@@ -333,7 +333,7 @@ export class TimeSync implements TimeSyncApi {
 		// We still need to let the logic go through if the current fastest
 		// interval is Infinity, so that we can support letting any arbitrary
 		// consumer invalidate the date immediately
-		const { isDisposed, isFrozen, allowDuplicateFunctionCalls } =
+		const { isDisposed, isFrozen, allowDuplicateOnUpdateCalls } =
 			this.#latestSnapshot;
 		const subscriptionsPaused =
 			isDisposed || isFrozen || this.#subscriptions.size === 0;
@@ -351,7 +351,7 @@ export class TimeSync implements TimeSyncApi {
 		// subscriber disposes of the whole TimeSync instance. Once the Map is
 		// cleared, the map's iterator will automatically break the loop. So
 		// there's no risk of continuing to dispatch values after cleanup.
-		if (allowDuplicateFunctionCalls) {
+		if (allowDuplicateOnUpdateCalls) {
 			for (const [onUpdate, subs] of this.#subscriptions) {
 				for (let i = 0; i < subs.length; i++) {
 					onUpdate(bound);

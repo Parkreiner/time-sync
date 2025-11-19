@@ -553,7 +553,7 @@ describe(TimeSync.name, () => {
 			const initialDate = initializeTime();
 			const sync = new TimeSync({
 				initialDate,
-				allowDuplicateFunctionCalls: true,
+				allowDuplicateOnUpdateCalls: true,
 			});
 
 			const sharedOnUpdate = vi.fn();
@@ -584,7 +584,7 @@ describe(TimeSync.name, () => {
 				isFrozen: false,
 				subscriberCount: 0,
 				minimumRefreshIntervalMs: minimumRefreshIntervalMs,
-				allowDuplicateFunctionCalls: false,
+				allowDuplicateOnUpdateCalls: false,
 			});
 		});
 
@@ -751,13 +751,13 @@ describe(TimeSync.name, () => {
 		});
 
 		it("Indicates deduplicated functions status", ({ expect }) => {
-			const normalSync = new TimeSync({ allowDuplicateFunctionCalls: false });
+			const normalSync = new TimeSync({ allowDuplicateOnUpdateCalls: false });
 			const normalSnap = normalSync.getStateSnapshot();
-			expect(normalSnap.allowDuplicateFunctionCalls).toBe(false);
+			expect(normalSnap.allowDuplicateOnUpdateCalls).toBe(false);
 
-			const frozenSync = new TimeSync({ allowDuplicateFunctionCalls: true });
+			const frozenSync = new TimeSync({ allowDuplicateOnUpdateCalls: true });
 			const frozenSnap = frozenSync.getStateSnapshot();
-			expect(frozenSnap.allowDuplicateFunctionCalls).toBe(true);
+			expect(frozenSnap.allowDuplicateOnUpdateCalls).toBe(true);
 		});
 
 		it("Prevents mutating properties at runtime", ({ expect }) => {
@@ -774,7 +774,7 @@ describe(TimeSync.name, () => {
 				isFrozen: true,
 				minimumRefreshIntervalMs: Number.POSITIVE_INFINITY,
 				subscriberCount: Number.POSITIVE_INFINITY,
-				allowDuplicateFunctionCalls: false,
+				allowDuplicateOnUpdateCalls: false,
 			};
 
 			const mutations: readonly (() => void)[] = [
@@ -795,8 +795,8 @@ describe(TimeSync.name, () => {
 						mutationSource.minimumRefreshIntervalMs;
 				},
 				() => {
-					snap.allowDuplicateFunctionCalls =
-						mutationSource.allowDuplicateFunctionCalls;
+					snap.allowDuplicateOnUpdateCalls =
+						mutationSource.allowDuplicateOnUpdateCalls;
 				},
 			];
 			for (const m of mutations) {
