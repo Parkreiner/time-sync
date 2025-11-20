@@ -95,23 +95,23 @@ export class ReadonlyDate extends Date implements ReadonlyDateApi {
 		 *    imports get evaluated, but most of the mock functionality happens
 		 *    at runtime. useFakeTimers is NOT hoisted
 		 * 4. A Vitest test file might import the readonly class at some point
-		 *    (directly or indirectly), so that link is established.
-		 * 5. useFakeTimers can then be called, and that updates the global
-		 *    scope so that when any FUTURE code references the global Date
-		 *    object, the fake version is used instead
+		 *    (directly or indirectly), which establishes the link
+		 * 5. useFakeTimers can then be called after imports, and that updates
+		 *    the global scope so that when any FUTURE code references the
+		 *    global Date object, the fake version is used instead
 		 * 6. But because the linking already happened before the call,
 		 *    ReadonlyDate will still be bound to the original Date object
 		 * 7. When super is called (which is required when extending classes),
 		 *    the original date object will be instantiated and then linked to
 		 *    the readonly instance via the prototype chain
-		 * 8. None of this is a problem when you're instantiating with actual
-		 *    inputs, because the date result will always be deterministic. The
-		 *    problem happens when you call super with no arguments, because
-		 *    that causes a new date to be created with the true system time,
-		 *    instead of the fake system time.
+		 * 8. None of this is a problem when you're instantiating the class by
+		 *    passing it actual inputs, because then the date result will always
+		 *    be deterministic. The problem happens when you make the date with
+		 *    no arguments, because that causes a new date to be created with
+		 *    the true system time, instead of the fake system time.
 		 * 9. So, to bridge the gap, we make a separate Date with `new Date()`
-		 *    (after it's been turned into the fake version), and then write its
-		 *    content into the date that was created with super/the real time.
+		 *    (after it's been turned into the fake version), and then use it to
+		 *    overwrite the contents of the real date created with super
 		 */
 		if (initValue === undefined) {
 			super();
