@@ -26,7 +26,7 @@ const useEffectEvent: typeof polyfill =
 
 const noOp = (..._: readonly unknown[]): void => {};
 
-export type InitialDate = Date | (() => Date);
+type InitialDate = Date | (() => Date);
 
 /**
  * @todo 2025-11-17 - This isn't 100% correct, but for the initial

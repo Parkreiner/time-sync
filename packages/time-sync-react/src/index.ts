@@ -1,7 +1,2 @@
 export * from "../../time-sync/src";
-export {
-	type InitialDate,
-	TimeSyncProvider,
-	useTimeSync,
-	useTimeSyncRef,
-} from "./useTimeSync";
+export { TimeSyncProvider, useTimeSync, useTimeSyncRef } from "./useTimeSync";
