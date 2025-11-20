@@ -61,7 +61,21 @@ afterEach(() => {
  * stay small, and since Vitest is pretty fast already, we're just going to use
  * serial tests for now.
  */
-describe(TimeSync.name, () => {
+describe(TimeSync, () => {
+	describe("Initialization", () => {
+		it("Lets users specify custom initial date", ({ expect }) => {
+			const dates: readonly Date[] = [
+				new Date("March 14, 2022"),
+				new ReadonlyDate("August 14, 2014"),
+			];
+			for (const initialDate of dates) {
+				const sync = new TimeSync({ initialDate });
+				const snap = sync.getStateSnapshot().date;
+				expect(snap).toEqual(initialDate);
+			}
+		});
+	});
+
 	describe("Subscriptions: general behavior", () => {
 		it("Never auto-updates state while there are zero subscribers", async ({
 			expect,
