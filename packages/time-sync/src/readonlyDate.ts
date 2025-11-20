@@ -16,13 +16,13 @@
  * Vitest uses .call because it's the more airtight thing to do in most
  * situations, but proxy objects only have traps for .apply calls, not .call. So
  * there is no way in the language to intercept these calls and make sure
- * they're going to the right place.
+ * they're going to the right place. It is a hard, HARD limitation.
  *
- * The good news, though, is that having an extended class might actually be the
- * better option, because it gives us the ability to define custom convenience
- * methods without breaking instanceof checks or breaking TypeScript
- * assignability for libraries that expect native dates. We just have to do a
- * little bit of extra work to fudge things for test runners.
+ * The good news, though, is that having an extended class seems like the better
+ * option, because it gives us the ability to define custom convenience methods
+ * without breaking instanceof checks or breaking TypeScript assignability for
+ * libraries that expect native dates. We just have to do a little bit of extra
+ * work to fudge things for test runners.
  */
 
 /**
@@ -101,10 +101,15 @@ export class ReadonlyDate extends Date implements ReadonlyDateApi {
 		 * `arguments` a good bit because the native Date relies on the meta
 		 * parameter so much for runtime behavior
 		 */
-		const hasInvalidInts = [...arguments].some((el) => {
-			return typeof el === "number" && (!Number.isInteger(el) || el < 0);
+		const hasInvalidNums = [...arguments].some((el) => {
+			/**
+			 * You almost never see them in practice, but native dates do
+			 * support using negative AND fractional values for instantiation.
+			 * Negative values produce values before 1970.
+			 */
+			return typeof el === "number" && !Number.isFinite(el);
 		});
-		if (hasInvalidInts) {
+		if (hasInvalidNums) {
 			throw new RangeError(
 				"Cannot instantiate ReadonlyDate via invalid integer(s)",
 			);
