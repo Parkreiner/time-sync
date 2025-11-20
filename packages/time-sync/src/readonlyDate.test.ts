@@ -137,4 +137,19 @@ describe(ReadonlyDate, () => {
 		expect(string).toBe("[object Date]");
 		expect(d[Symbol.toStringTag]()).toBe("Date");
 	});
+
+	it("Throws when provided invalid input (instead of failing siliently like with native dates)", ({
+		expect,
+	}) => {
+		const samples: readonly Date[] = [
+			new Date(NaN),
+			new Date(new Date(NaN)),
+			new Date("blah"),
+			new Date(Number.NEGATIVE_INFINITY),
+			new Date(-Number.NEGATIVE_INFINITY),
+		];
+		for (const s of samples) {
+			expect(() => new ReadonlyDate(s)).toThrow(RangeError);
+		}
+	});
 });

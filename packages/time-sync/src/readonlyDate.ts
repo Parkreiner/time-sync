@@ -45,10 +45,9 @@ interface ReadonlyDateApi {
  * .toNativeDate method to do a runtime conversion to a native/mutable date.
  */
 export class ReadonlyDate extends Date implements ReadonlyDateApi {
-	// Very chaotic type signature, but that's an artifact of how wonky the
-	// native Date type is. Using conditional types isn't great, because the
-	// number of arguments you can pass in can vary so much, so we're going for
-	// ugly constructor overloads
+	// Native dates support such a wide range of arguments (from 0 to 7), so
+	// conditional types would be incredibly awkward here. Just using
+	// constructor overloads instead
 	constructor();
 	constructor(initValue: number | string | Date);
 	constructor(year: number, monthIndex: number);
@@ -79,16 +78,48 @@ export class ReadonlyDate extends Date implements ReadonlyDateApi {
 		milliseconds?: number,
 	) {
 		/**
+		 * One problem with the native Date type is that they allow you to
+		 * produce invalid dates silently, and you won't find out until it's too
+		 * late. It's a lot like NaN for numbers.
+		 *
+		 * Taking some extra steps to make sure that they can't ever creep into
+		 * the library and break all the state modeling.
+		 *
+		 * Strings are still a problem, but that gets taken care of later in the
+		 * constructor.
+		 */
+		const hasInvalidSourceDate =
+			initValue instanceof Date && initValue.toString() === "Invalid Date";
+		if (hasInvalidSourceDate) {
+			throw new RangeError(
+				"Cannot instantiate ReadonlyDate via invalid date object",
+			);
+		}
+
+		/**
+		 * biome-ignore lint:complexity/noArguments -- We're going to be using
+		 * `arguments` a good bit because the native Date relies on the meta
+		 * parameter so much for runtime behavior
+		 */
+		const hasInvalidInts = [...arguments].some((el) => {
+			return typeof el === "number" && (!Number.isInteger(el) || el < 0);
+		});
+		if (hasInvalidInts) {
+			throw new RangeError(
+				"Cannot instantiate ReadonlyDate via invalid integer(s)",
+			);
+		}
+
+		/**
 		 * This guard clause looks incredibly silly, but we need to do this to
 		 * make sure that the readonly class works properly with Jest, Vitest,
 		 * and anything else that supports fake timers. Critically, it makes
 		 * this possible without introducing any extra runtime dependencies.
 		 *
 		 * Basically:
-		 * 1. We need to make sure that ReadonlyDate is linked to the Date
-		 *    prototype, so that instanceof checks work correctly, and so that
-		 *    the class can interop with all libraries that rely on vanilla
-		 *    Dates.
+		 * 1. We need to make sure that ReadonlyDate extends the Date prototype,
+		 *    so that instanceof checks work correctly, and so that the class
+		 *    can interop with all libraries that rely on vanilla Dates
 		 * 2. In ECMAScript, this linking happens right as the module is
 		 *    imported
 		 * 3. Jest and Vitest will do some degree of hoisting before the
@@ -120,6 +151,16 @@ export class ReadonlyDate extends Date implements ReadonlyDateApi {
 			return;
 		}
 
+		if (typeof initValue === "string") {
+			super(initValue);
+			if (super.toString() === "Invalid Date") {
+				throw new RangeError(
+					"Cannot instantiate ReadonlyDate via invalid string",
+				);
+			}
+			return;
+		}
+
 		if (monthIndex === undefined) {
 			super(initValue);
 			return;
@@ -130,19 +171,12 @@ export class ReadonlyDate extends Date implements ReadonlyDateApi {
 			);
 		}
 
-		/* biome-ignore lint:complexity/noArguments -- Native dates are super
+		/**
+		 * biome-ignore lint:complexity/noArguments -- Native dates are super
 		 * wonky, and they actually check arguments.length to define behavior
 		 * at runtime. We can't pass all the arguments in via a single call,
 		 * because then the constructor will create an invalid date the moment
 		 * it finds any single undefined value.
-		 *
-		 * Note that invalid dates are still date objects, and basically behave
-		 * like NaN. We're going to throw errors as much as we can to avoid
-		 * those weird values from creeping into the library.
-		 *
-		 * This is a weird case where TypeScript won't be able to help us,
-		 * because it has no concept of the arguments meta parameter in its type
-		 * system. Brendan Eich's sins in 1995 are biting us 30 years later.
 		 */
 		const argCount = arguments.length;
 		switch (argCount) {
