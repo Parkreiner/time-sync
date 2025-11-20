@@ -10,10 +10,9 @@ export {
 	type Snapshot,
 	type SubscriptionHandshake,
 } from "../../time-sync/src";
+export type { TransformCallback } from "./general";
+export { useTimeSync, useTimeSyncRef } from "./hooks";
 export {
 	TimeSyncProvider,
 	type TimeSyncProviderProps,
-	type TimeSyncWithoutDispose,
-	useTimeSync,
-	useTimeSyncRef,
-} from "./useTimeSync";
+} from "./TimeSyncProvider";

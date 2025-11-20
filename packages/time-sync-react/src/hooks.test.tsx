@@ -12,7 +12,7 @@ import { render, renderHook, screen } from "@testing-library/react";
 import { type FC, useEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { refreshRates } from "../../time-sync/src";
-import { TimeSyncProvider, useTimeSync, useTimeSyncRef } from "./useTimeSync";
+import { TimeSyncProvider, useTimeSync, useTimeSyncRef } from "./hooks";
 
 beforeEach(() => {
 	vi.useFakeTimers();
