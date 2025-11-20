@@ -434,6 +434,7 @@ export class TimeSync implements TimeSyncApi {
 		// it as a normal interval afterwards
 		this.#intervalId = setInterval(() => {
 			clearInterval(this.#intervalId);
+			this.#onTick();
 			this.#intervalId = setInterval(this.#onTick, fastest);
 		}, timeBeforeNextUpdate);
 	}
@@ -560,12 +561,11 @@ export class TimeSync implements TimeSyncApi {
 		);
 		entries.push({ unsubscribe, targetInterval });
 		entries.sort((e1, e2) => e1.targetInterval - e2.targetInterval);
-		this.#updateFastestInterval();
-
 		this.#latestSnapshot = Object.freeze({
 			...this.#latestSnapshot,
 			subscriberCount: this.#latestSnapshot.subscriberCount + 1,
 		});
+		this.#updateFastestInterval();
 
 		// Immediately update the snapshot because we don't know how much time
 		// could have elapsed between the TimeSync being instantiated and the

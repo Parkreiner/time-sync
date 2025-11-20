@@ -481,7 +481,7 @@ describe(TimeSync, () => {
 		 * (you can't completely remove them) might make the library a nightmare
 		 * to maintain.
 		 */
-		it.only("Does not completely start next interval over from scratch if fastest subscription is removed halfway through update", async ({
+		it("Does not completely start next interval over from scratch if fastest subscription is removed halfway through update", async ({
 			expect,
 		}) => {
 			const initialDate = initializeTime();
