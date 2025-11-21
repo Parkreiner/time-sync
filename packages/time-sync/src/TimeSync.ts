@@ -434,8 +434,14 @@ export class TimeSync implements TimeSyncApi {
 		// it as a normal interval afterwards
 		this.#intervalId = setInterval(() => {
 			clearInterval(this.#intervalId);
-			this.#onTick();
+
+			// Need to set up interval before ticking in the tiny, tiny chance
+			// that ticking would cause the TimeSync instance to be disposed. We
+			// don't want to start a new interval right after we've lost our
+			// ability to do cleanup. The timer won't starting getting processed
+			// until the function leaves scope anyway
 			this.#intervalId = setInterval(this.#onTick, fastest);
+			this.#onTick();
 		}, timeBeforeNextUpdate);
 	}
 
