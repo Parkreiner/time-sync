@@ -205,6 +205,11 @@ type SubscriptionEntry = Readonly<{
 	unsubscribe: () => void;
 }>;
 
+type UpdateDateResult = Readonly<{
+	wasChanged: boolean;
+	dateBeforeUpdate: ReadonlyDate;
+}>;
+
 function noOp(..._: readonly unknown[]): void {}
 
 const defaultMinimumRefreshIntervalMs = 200;
@@ -244,19 +249,7 @@ const defaultMinimumRefreshIntervalMs = 200;
  * some parts of the screen.)
  */
 export class TimeSync implements TimeSyncApi {
-	/**
-	 * Indicates whether there has been a de-sync from the TimeSync's internal
-	 * state being updated, and subscribers not yet being notified.
-	 *
-	 * Right now, this is only relevant for when you invalidate the state and
-	 * set the notification behavior to "never".
-	 *
-	 * @todo 2025-11-19 - Should probably turn this into a date so that we have
-	 * more granular information and can track when the de-sync started. We can
-	 * always derive a boolean from it by comparing it against the date in the
-	 * latest snapshot.
-	 */
-	#hasPendingBroadcast: boolean;
+	#latestSnapshot: Snapshot;
 
 	/**
 	 * Indicates when the last successful state update dispatch was. Can be used
@@ -266,23 +259,6 @@ export class TimeSync implements TimeSyncApi {
 	 * way for it to transition back to null.
 	 */
 	#lastDispatchDate: ReadonlyDate | null;
-
-	/**
-	 * An immutable value representation of the TimeSync state that might be
-	 * relevant to an outside consumer.
-	 *
-	 * Should be defined with readonly types AND frozen at runtime to prevent
-	 * the system from falling apart from accidental mutations.
-	 *
-	 * Tried making a private method for deriving new snapshots by letting you
-	 * supply partial updates and merging them with the latest snapshot. But it
-	 * felt clunky, especially since some properties on the snapshot currently
-	 * cannot being able to change at runtime. The method felt like it would
-	 * have more risk of causing bugs by letting properties change when they
-	 * shouldn't. There also aren't that many points where a snapshot can change
-	 * right now.
-	 */
-	#latestSnapshot: Snapshot;
 
 	/**
 	 * Stores all refresh intervals actively associated with an onUpdate
@@ -334,7 +310,6 @@ export class TimeSync implements TimeSyncApi {
 			);
 		}
 
-		this.#hasPendingBroadcast = false;
 		this.#subscriptions = new Map();
 		this.#fastestRefreshInterval = Number.POSITIVE_INFINITY;
 		this.#intervalId = undefined;
@@ -353,21 +328,21 @@ export class TimeSync implements TimeSyncApi {
 	}
 
 	#notifyAllSubscriptions(): void {
+		// It's more important that we copy the date object into a separate
+		// variable here than normal, because need make sure the `this` context
+		// can't magically change between updates and cause subscribers to
+		// receive different values (e.g., one of the subscribers calls the
+		// invalidate method)
+		const { isDisposed, date, config } = this.#latestSnapshot;
+
 		// We still need to let the logic go through if the current fastest
 		// interval is Infinity, so that we can support letting any arbitrary
 		// consumer invalidate the date immediately
-		const { isDisposed, config } = this.#latestSnapshot;
 		const subscriptionsPaused =
 			isDisposed || config.freezeUpdates || this.#subscriptions.size === 0;
 		if (subscriptionsPaused) {
 			return;
 		}
-
-		// Copying the latest state into a separate variable, just to make
-		// absolutely sure that if the `this` context magically changes between
-		// callback calls (e.g., one of the subscribers calling the invalidate
-		// method), it doesn't cause subscribers to receive different values.
-		const bound = this.#latestSnapshot.date;
 
 		// While this is a super niche use case, we're actually safe if a
 		// subscriber disposes of the whole TimeSync instance. Once the Map is
@@ -375,16 +350,17 @@ export class TimeSync implements TimeSyncApi {
 		// there's no risk of continuing to dispatch values after cleanup.
 		if (config.allowDuplicateOnUpdateCalls) {
 			for (const [onUpdate, subs] of this.#subscriptions) {
-				for (let i = 0; i < subs.length; i++) {
-					onUpdate(bound);
+				for (const _ of subs) {
+					onUpdate(date);
 				}
 			}
-			return;
+		} else {
+			for (const onUpdate of this.#subscriptions.keys()) {
+				onUpdate(date);
+			}
 		}
 
-		for (const onUpdate of this.#subscriptions.keys()) {
-			onUpdate(bound);
-		}
+		this.#lastDispatchDate = date;
 	}
 
 	/**
@@ -404,11 +380,17 @@ export class TimeSync implements TimeSyncApi {
 			return;
 		}
 
-		const wasUpdated = this.#updateDate();
-		if (wasUpdated || this.#hasPendingBroadcast) {
+		const { wasChanged } = this.#updateDate();
+		const timeSinceLastBroadcast =
+			this.#lastDispatchDate === null
+				? Number.POSITIVE_INFINITY
+				: this.#latestSnapshot.date.getTime() -
+					this.#lastDispatchDate.getTime();
+
+		const hasPendingBroadcast = timeSinceLastBroadcast !== 0;
+		if (wasChanged || hasPendingBroadcast) {
 			this.#notifyAllSubscriptions();
 		}
-		this.#hasPendingBroadcast = false;
 	};
 
 	#onFastestIntervalChange(): void {
@@ -431,10 +413,9 @@ export class TimeSync implements TimeSyncApi {
 		clearInterval(this.#intervalId);
 
 		if (timeBeforeNextUpdate <= 0) {
-			const updated = this.#updateDate();
-			if (updated) {
+			const { wasChanged } = this.#updateDate();
+			if (wasChanged) {
 				this.#notifyAllSubscriptions();
-				this.#hasPendingBroadcast = false;
 			}
 			this.#intervalId = setInterval(this.#onTick, fastest);
 			return;
@@ -489,27 +470,20 @@ export class TimeSync implements TimeSyncApi {
 	}
 
 	/**
-	 * Attempts to update the current Date snapshot, no questions asked.
-	 * @returns {boolean} Indicates whether the state actually changed.
+	 * Attempts to update the current Date snapshot.
 	 */
-	#updateDate(stalenessThresholdMs = 0): boolean {
-		const { isDisposed, config, date } = this.#latestSnapshot;
+	#updateDate(): UpdateDateResult {
+		const { isDisposed, config, date: dateBeforeUpdate } = this.#latestSnapshot;
 		if (isDisposed || config.freezeUpdates) {
-			return false;
-		}
-
-		const newSnap = new ReadonlyDate();
-		const exceedsUpdateThreshold =
-			newSnap.getTime() - date.getTime() >= stalenessThresholdMs;
-		if (!exceedsUpdateThreshold) {
-			return false;
+			return { dateBeforeUpdate, wasChanged: false };
 		}
 
 		this.#latestSnapshot = Object.freeze({
 			...this.#latestSnapshot,
-			date: newSnap,
+			date: new ReadonlyDate(),
 		});
-		return true;
+
+		return { dateBeforeUpdate, wasChanged: true };
 	}
 
 	subscribe(sh: SubscriptionHandshake): () => void {
@@ -617,22 +591,22 @@ export class TimeSync implements TimeSyncApi {
 			return this.#latestSnapshot;
 		}
 
-		const wasChanged = this.#updateDate(stalenessThresholdMs);
+		const { dateBeforeUpdate } = this.#updateDate();
 		switch (notificationBehavior) {
 			case "never": {
-				this.#hasPendingBroadcast = wasChanged;
 				break;
 			}
 			case "always": {
-				this.#hasPendingBroadcast = false;
 				this.#notifyAllSubscriptions();
 				break;
 			}
 			case "onChange": {
-				if (wasChanged || this.#hasPendingBroadcast) {
+				const meetsThreshold =
+					this.#latestSnapshot.date.getTime() - dateBeforeUpdate.getTime() >=
+					stalenessThresholdMs;
+				if (meetsThreshold) {
 					this.#notifyAllSubscriptions();
 				}
-				this.#hasPendingBroadcast = false;
 				break;
 			}
 		}
