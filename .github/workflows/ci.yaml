@@ -1,7 +1,7 @@
 name: ci
 
 on:
-  push:
+  pull_request:
     branches: [main]
 
 # Cancel in-progress runs for pull requests when devs push extra changes
