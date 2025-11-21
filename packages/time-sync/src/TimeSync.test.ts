@@ -1233,9 +1233,9 @@ describe(TimeSync, () => {
 	});
 
 	/**
-	 * @todo 2025-11-17 - The intention with the frozen status is that once set
-	 * on init, there should be no way to make it un-frozen – a consumer would
-	 * need to create a fresh instance from scratch.
+	 * The intention with the frozen status is that once set on init, there
+	 * should be no way to make it un-frozen – a consumer would need to create a
+	 * fresh instance from scratch.
 	 *
 	 * Not sure how to codify that in tests yet, but ideally it should be.
 	 */
