@@ -6,7 +6,7 @@ export default defineConfig({
 		include: ["**/*.test.{ts,tsx}"],
 		environment: "happy-dom",
 		env: {
-			TZ: "UTC",
+			TZ: "US/Eastern",
 		},
 	},
 });
