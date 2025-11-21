@@ -41,7 +41,8 @@
 				"noUnusedImports": "error",
 				"noConstantCondition": "error",
 				"noConstantMathMinMaxClamp": "error",
-				"noNestedComponentDefinitions": "error"
+				"noNestedComponentDefinitions": "error",
+				"noUnusedVariables": "error"
 			},
 			"style": {
 				"noDefaultExport": "error",
@@ -49,7 +50,8 @@
 				"noNonNullAssertion": "error",
 				"useConst": "error",
 				"useConsistentCurlyBraces": "error",
-				"useNumericSeparators": "error"
+				"useNumericSeparators": "error",
+				"useSingleVarDeclarator": "error"
 			},
 			"suspicious": {
 				"recommended": true,

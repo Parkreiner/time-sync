@@ -1114,7 +1114,6 @@ describe(TimeSync, () => {
 		}) => {
 			const initialDate = initializeTime();
 			const sync = new TimeSync({ initialDate });
-			const initialSnap = sync.getStateSnapshot();
 
 			const onUpdate = vi.fn();
 			void sync.subscribe({
