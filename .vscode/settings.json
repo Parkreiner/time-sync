@@ -16,6 +16,8 @@
 
 	// @todo - 2025-11-22 - Use Biome once it supports markdown
 	"[markdown]": {
-		"editor.defaultFormatter": "esbenp.prettier-vscode"
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.wordWrap": "bounded",
+		"editor.wordWrapColumn": 80
 	}
 }
