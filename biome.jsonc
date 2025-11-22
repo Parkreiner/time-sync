@@ -81,12 +81,24 @@
 			},
 			"suspicious": {
 				"recommended": true,
+				"useGuardForIn": "warn",
+
 				"noSkippedTests": "error",
 				"noFocusedTests": "error",
 				"noConsole": "error",
 				"noAlert": "error",
 				"noApproximativeNumericConstant": "error",
-				"noExplicitAny": "error"
+				"noExplicitAny": "error",
+				"noConstEnum": "error",
+				"noEmptyBlockStatements": "error",
+				"noEvolvingTypes": "error",
+				"noGlobalIsFinite": "error",
+				"noTsIgnore": "error",
+				"noUnassignedVariables": "error",
+				"noVar": "error",
+				"useErrorMessage": "error",
+				"useIsArray": "error",
+				"useNumberToFixedDigitsArgument": "error"
 			}
 		}
 	},
